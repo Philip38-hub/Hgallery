@@ -1,4 +1,4 @@
-import { HashConnect, HashConnectTypes, MessageTypes } from '@hashgraph/hashconnect';
+import { HashConnect, HashConnectTypes, MessageTypes } from '@hashpack/hashconnect';
 import { AccountId, LedgerId } from '@hashgraph/sdk';
 
 export interface HashPackConnectionState {
