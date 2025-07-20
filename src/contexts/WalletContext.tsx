@@ -1,13 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { WalletConnection } from '@/types/hedera';
+import { hashConnectService, HashPackConnectionState } from '@/services/hashConnectService';
 import { toast } from '@/hooks/use-toast';
 
 interface WalletContextType {
   wallet: WalletConnection | null;
   isConnecting: boolean;
+  pairingString: string;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   isWalletConnected: boolean;
+  signTransaction: (transaction: any) => Promise<any>;
+  signMessage: (message: string) => Promise<string>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -27,27 +31,32 @@ interface WalletProviderProps {
 export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [wallet, setWallet] = useState<WalletConnection | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [pairingString, setPairingString] = useState('');
 
+  const updateWalletState = (hashConnectState: HashPackConnectionState) => {
+    if (hashConnectState.isConnected && hashConnectState.accountId) {
+      const walletConnection: WalletConnection = {
+        accountId: hashConnectState.accountId,
+        isConnected: true,
+        network: hashConnectState.network
+      };
+      setWallet(walletConnection);
+      localStorage.setItem('hedera_wallet', JSON.stringify(walletConnection));
+    } else {
+      setWallet(null);
+      localStorage.removeItem('hedera_wallet');
+    }
+    setPairingString(hashConnectState.pairingString);
+  };
   const connectWallet = async () => {
     setIsConnecting(true);
     
     try {
-      // For now, we'll simulate wallet connection since HashPack package didn't install
-      // In production, this would integrate with HashPack/HashConnect
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate connection time
-      
-      const mockConnection: WalletConnection = {
-        accountId: '0.0.123456',
-        isConnected: true,
-        network: 'testnet'
-      };
-      
-      setWallet(mockConnection);
-      localStorage.setItem('hedera_wallet', JSON.stringify(mockConnection));
+      await hashConnectService.connectWallet();
       
       toast({
         title: "Wallet Connected",
-        description: `Connected to account ${mockConnection.accountId}`,
+        description: "HashPack wallet connection initiated",
       });
     } catch (error) {
       console.error('Failed to connect wallet:', error);
@@ -62,33 +71,49 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   };
 
   const disconnectWallet = () => {
-    setWallet(null);
-    localStorage.removeItem('hedera_wallet');
+    hashConnectService.disconnectWallet();
     toast({
       title: "Wallet Disconnected",
       description: "Successfully disconnected from wallet",
     });
   };
 
+  const signTransaction = async (transaction: any): Promise<any> => {
+    try {
+      return await hashConnectService.signTransaction(transaction);
+    } catch (error) {
+      console.error('Failed to sign transaction:', error);
+      throw error;
+    }
+  };
+
+  const signMessage = async (message: string): Promise<string> => {
+    try {
+      return await hashConnectService.signMessage(message);
+    } catch (error) {
+      console.error('Failed to sign message:', error);
+      throw error;
+    }
+  };
   // Check for existing connection on mount
   useEffect(() => {
-    const savedWallet = localStorage.getItem('hedera_wallet');
-    if (savedWallet) {
-      try {
-        const parsed = JSON.parse(savedWallet);
-        setWallet(parsed);
-      } catch (error) {
-        console.error('Failed to parse saved wallet:', error);
-        localStorage.removeItem('hedera_wallet');
-      }
-    }
+    // Set up HashConnect state listener
+    const unsubscribe = hashConnectService.onStateChange(updateWalletState);
+    
+    // Initialize with current state
+    updateWalletState(hashConnectService.getState());
+    
+    return unsubscribe;
   }, []);
 
   const value: WalletContextType = {
     wallet,
     isConnecting,
+    pairingString,
     connectWallet,
     disconnectWallet,
+    signTransaction,
+    signMessage,
     isWalletConnected: wallet?.isConnected || false,
   };
 

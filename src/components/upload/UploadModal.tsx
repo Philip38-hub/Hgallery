@@ -10,6 +10,8 @@ import { Upload, X, File, Image, Video, Plus, Loader2, CheckCircle2, AlertCircle
 import { useWallet } from '@/contexts/WalletContext';
 import { toast } from '@/hooks/use-toast';
 import { MediaMetadata, UploadProgress } from '@/types/hedera';
+import { ipfsService } from '@/services/ipfsService';
+import { hederaService } from '@/services/hederaService';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -125,45 +127,69 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setUploadProgress(progress);
 
     try {
-      // Simulate IPFS upload
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setUploadProgress(prev => prev ? { ...prev, progress: i } : null);
-      }
+      // Upload file to IPFS
+      setUploadProgress(prev => prev ? { ...prev, progress: 25 } : null);
+      const fileUpload = await ipfsService.uploadFile(selectedFile);
+      
+      setUploadProgress(prev => prev ? { ...prev, progress: 50 } : null);
+      
+      // Create metadata and upload to IPFS
+      const nftMetadata = {
+        name: metadata.title || '',
+        description: metadata.description || '',
+        image: fileUpload.url,
+        type: metadata.mediaType || 'image',
+        properties: {
+          creator: wallet.accountId,
+          tags: metadata.tags || [],
+          originalFileName: metadata.originalFileName || selectedFile.name,
+          fileSize: selectedFile.size,
+          uploadDate: new Date().toISOString()
+        }
+      };
+      
+      const metadataUpload = await ipfsService.uploadMetadata(nftMetadata);
+      setUploadProgress(prev => prev ? { ...prev, progress: 75 } : null);
 
-      // Simulate NFT minting
+      // Mint NFT on Hedera
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
       
-      for (let i = 0; i <= 100; i += 20) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setUploadProgress(prev => prev ? { ...prev, progress: i } : null);
-      }
+      // For demo purposes, we'll use a default collection token ID
+      // In production, you'd either create a new collection or use an existing one
+      const defaultTokenId = '0.0.123456'; // Replace with actual token ID
+      
+      const mintResult = await hederaService.mintNFT(
+        defaultTokenId,
+        nftMetadata,
+        wallet.accountId
+      );
+      
+      setUploadProgress(prev => prev ? { ...prev, progress: 100 } : null);
 
       // Complete
       setUploadProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
       
-      const mockTokenId = `0.0.${Math.floor(Math.random() * 999999)}`;
-      
       toast({
         title: "Upload Successful!",
-        description: `Your media has been minted as NFT ${mockTokenId}`,
+        description: `Your media has been minted as NFT ${mintResult.tokenId}#${mintResult.serialNumber}`,
       });
 
       setTimeout(() => {
-        onUploadComplete?.(mockTokenId);
+        onUploadComplete?.(mintResult.tokenId);
         handleClose();
       }, 2000);
 
     } catch (error) {
+      console.error('Upload error:', error);
       setUploadProgress(prev => prev ? { 
         ...prev, 
         status: 'error', 
-        error: 'Upload failed. Please try again.' 
+        error: error instanceof Error ? error.message : 'Upload failed. Please try again.' 
       } : null);
       
       toast({
         title: "Upload Failed",
-        description: "There was an error uploading your media. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error uploading your media. Please try again.",
         variant: "destructive",
       });
     }

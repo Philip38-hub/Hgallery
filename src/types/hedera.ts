@@ -44,15 +44,22 @@ export interface UploadProgress {
   error?: string;
 }
 
-// HashPack wallet types (simplified for now since the package didn't install)
-export interface HashConnectSigner {
-  sign: (message: Uint8Array) => Promise<Uint8Array>;
-  getAccountId: () => Promise<string>;
+// Collection and NFT management types
+export interface NFTCollection {
+  tokenId: string;
+  name: string;
+  symbol: string;
+  totalSupply: number;
+  treasuryAccountId: string;
+  createdAt: string;
 }
 
-export interface HashPackConnectionState {
-  topic: string;
-  pairingString: string;
-  savedPairings: any[];
-  availableExtensions: any[];
+export interface UserProfile {
+  accountId: string;
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+  collections: NFTCollection[];
+  totalNFTs: number;
+  joinedAt: string;
 }

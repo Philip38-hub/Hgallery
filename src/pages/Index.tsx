@@ -6,10 +6,9 @@ import { UploadModal } from '@/components/upload/UploadModal';
 import { MediaViewer } from '@/components/media/MediaViewer';
 import { WalletProvider } from '@/contexts/WalletContext';
 import { MediaNFT, SearchFilters } from '@/types/hedera';
+import { hederaService } from '@/services/hederaService';
+import { ipfsService } from '@/services/ipfsService';
 import { toast } from '@/hooks/use-toast';
-import sunsetMountains from '@/assets/sunset-mountains.jpg';
-import streetArt from '@/assets/street-art.jpg';
-import oceanWaves from '@/assets/ocean-waves.jpg';
 
 // Mock data for demonstration
 const mockMediaData: MediaNFT[] = [
@@ -135,17 +134,37 @@ const Index = () => {
       title: "Upload Successful!",
       description: `Your media has been minted as NFT ${tokenId}`,
     });
-    // In a real app, you would refresh the gallery data here
+    // Refresh gallery data
+    loadGalleryData();
+  };
+
+  const loadGalleryData = async () => {
+    try {
+      // In a real implementation, you would fetch NFTs from Hedera Mirror Node
+      // For now, we'll use the mock data
+      setFilteredMedia(mockMediaData);
+    } catch (error) {
+      console.error('Error loading gallery data:', error);
+      toast({
+        title: "Error Loading Gallery",
+        description: "Failed to load gallery data. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRefresh = () => {
-    setFilteredMedia(mockMediaData);
+    loadGalleryData();
     toast({
       title: "Gallery Refreshed",
       description: "Showing all available media",
     });
   };
 
+  // Load initial gallery data
+  React.useEffect(() => {
+    loadGalleryData();
+  }, []);
   return (
     <WalletProvider>
       <div className="min-h-screen bg-gradient-background">
