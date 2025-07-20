@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.68.0",
-    "@hashpack/hashconnect": "^1.1.0",
+    "hashconnect": "^3.0.13",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -52,7 +52,7 @@
     "ipfs-http-client": "^60.0.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
-    "pinata-web3": "^1.0.0",
+    "pinata-web3": "^0.5.4",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -84,5 +84,8 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"
+  },
+  "overrides": {
+    "@hashgraph/sdk": "^2.68.0"
   }
 }
