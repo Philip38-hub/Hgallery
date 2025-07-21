@@ -2,6 +2,7 @@ import {
   Client,
   AccountId,
   PrivateKey,
+  PublicKey, // Added PublicKey import
   TokenCreateTransaction,
   TokenType,
   TokenSupplyType,
@@ -14,8 +15,18 @@ import {
   TransferTransaction,
   AccountBalanceQuery,
   TokenNftInfoQuery,
-  NftId // Added NftId import
+  NftId, // Added NftId import
+  ContractInfoQuery // Added ContractInfoQuery import
 } from '@hashgraph/sdk';
+import dotenv from 'dotenv'; // Import dotenv
+import { fileURLToPath } from 'url'; // Import fileURLToPath
+import { dirname } from 'path'; // Import dirname
+import * as path from 'path'; // Import path
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') }); // Load environment variables from root .env
 
 export interface TokenCreationResult {
   tokenId: string;
@@ -47,16 +58,16 @@ export class HederaService {
   private operatorKey: PrivateKey;
 
   constructor() {
-    const network = import.meta.env.VITE_HEDERA_NETWORK || 'testnet';
-    const operatorId = import.meta.env.VITE_HEDERA_OPERATOR_ID;
-    const operatorKey = import.meta.env.VITE_HEDERA_OPERATOR_KEY;
+    const network = process.env.HEDERA_NETWORK || 'testnet';
+    const operatorId = process.env.HEDERA_OPERATOR_ID;
+    const operatorKey = process.env.HEDERA_OPERATOR_KEY;
 
     if (!operatorId || !operatorKey) {
       throw new Error('Hedera operator credentials not configured');
     }
 
     this.operatorId = AccountId.fromString(operatorId);
-    this.operatorKey = PrivateKey.fromString(operatorKey);
+    this.operatorKey = PrivateKey.fromStringECDSA(operatorKey); // Assuming ECDSA key
 
     if (network === 'mainnet') {
       this.client = Client.forMainnet();
@@ -67,10 +78,15 @@ export class HederaService {
     this.client.setOperator(this.operatorId, this.operatorKey);
   }
 
+  public getOperatorPublicKey(): PublicKey {
+    return this.operatorKey.publicKey;
+  }
+
   async createNFTCollection(
     name: string,
     symbol: string,
-    treasuryAccountId: string
+    treasuryAccountId: string,
+    supplyKey?: PrivateKey | PublicKey // Changed to PublicKey
   ): Promise<string> {
     try {
       const tokenCreateTx = new TokenCreateTransaction()
@@ -80,7 +96,7 @@ export class HederaService {
         .setSupplyType(TokenSupplyType.Infinite)
         .setInitialSupply(0)
         .setTreasuryAccountId(treasuryAccountId)
-        .setSupplyKey(this.operatorKey)
+        .setSupplyKey(supplyKey || this.operatorKey) // Use provided supplyKey or operatorKey
         .setAdminKey(this.operatorKey)
         .setMaxTransactionFee(new Hbar(30))
         .freezeWith(this.client);
@@ -234,6 +250,26 @@ export class HederaService {
       };
     } catch (error) {
       console.error('Error getting account balance:', error);
+      throw error;
+    }
+    
+  }
+
+  public async getContractInfo(contractId: string) {
+    try {
+      const contractInfo = await new ContractInfoQuery()
+        .setContractId(contractId)
+        .execute(this.client);
+
+      return {
+        contractId: contractInfo.contractId.toString(),
+        accountId: contractInfo.accountId?.toString(),
+        adminKey: contractInfo.adminKey, // Return as Key object
+        // Note: evmAddress and memo are not directly available on ContractInfo in Hedera SDK v2
+        // You might need to query the mirror node for these details if required.
+      };
+    } catch (error) {
+      console.error('Error getting contract info:', error);
       throw error;
     }
   }
