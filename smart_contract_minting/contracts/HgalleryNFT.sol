@@ -15,7 +15,6 @@ contract HgalleryNFT is ERC721URIStorage, Ownable {
 
     function mint(address to, string memory uri)
         public
-        onlyOwner
         returns (uint256)
     {
         uint256 tokenId = _nextTokenId++;
