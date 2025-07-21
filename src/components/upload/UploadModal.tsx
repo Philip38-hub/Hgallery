@@ -138,10 +138,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         name: metadata.title || '',
         description: metadata.description || '',
         image: fileUpload.url,
-        type: metadata.mediaType || 'image',
+        type: metadata.mediaType || 'image', // Re-added for HederaService
+        attributes: (metadata.tags || []).map(tag => ({
+          trait_type: 'Tag',
+          value: tag
+        })),
         properties: {
           creator: wallet.accountId,
-          tags: metadata.tags || [],
+          tags: metadata.tags || [], // Keep tags for Hedera's properties
           originalFileName: metadata.originalFileName || selectedFile.name,
           fileSize: selectedFile.size,
           uploadDate: new Date().toISOString()
@@ -154,12 +158,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       // Mint NFT on Hedera
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
       
-      // For demo purposes, we'll use a default collection token ID
-      // In production, you'd either create a new collection or use an existing one
-      const defaultTokenId = '0.0.123456'; // Replace with actual token ID
+      // In a production environment, you would either create a new collection
+      // or use an existing one. For this example, we'll use a configurable token ID.
+      const collectionTokenId = import.meta.env.VITE_HEDERA_COLLECTION_TOKEN_ID;
+
+      if (!collectionTokenId) {
+        throw new Error('Hedera Collection Token ID not configured. Please set VITE_HEDERA_COLLECTION_TOKEN_ID in your .env file.');
+      }
       
       const mintResult = await hederaService.mintNFT(
-        defaultTokenId,
+        collectionTokenId,
         nftMetadata,
         wallet.accountId
       );

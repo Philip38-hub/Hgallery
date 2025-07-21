@@ -13,7 +13,8 @@ import {
   TokenAssociateTransaction,
   TransferTransaction,
   AccountBalanceQuery,
-  TokenNftInfoQuery
+  TokenNftInfoQuery,
+  NftId // Added NftId import
 } from '@hashgraph/sdk';
 
 export interface TokenCreationResult {
@@ -27,6 +28,10 @@ export interface NFTMetadata {
   description: string;
   image: string;
   type: string;
+  attributes?: Array<{ // Added attributes to NFTMetadata
+    trait_type: string;
+    value: string;
+  }>;
   properties: {
     creator: string;
     tags: string[];
@@ -193,7 +198,7 @@ export class HederaService {
   async getNFTInfo(tokenId: string, serialNumber: number) {
     try {
       const nftInfo = await new TokenNftInfoQuery()
-        .setNftId(TokenId.fromString(tokenId).nft(serialNumber))
+        .setNftId(new NftId(TokenId.fromString(tokenId), serialNumber))
         .execute(this.client);
 
       if (nftInfo.length === 0) {
