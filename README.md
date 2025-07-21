@@ -43,9 +43,9 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
 4. Configure your environment variables in `.env`:
    ```env
    # Hedera Network Configuration
-   VITE_HEDERA_NETWORK=testnet
-   VITE_HEDERA_OPERATOR_ID=0.0.YOUR_ACCOUNT_ID
-   VITE_HEDERA_OPERATOR_KEY=YOUR_PRIVATE_KEY
+   HEDERA_NETWORK=testnet
+   HEDERA_OPERATOR_ID=0.0.YOUR_ACCOUNT_ID
+   HEDERA_OPERATOR_KEY=YOUR_PRIVATE_KEY
 
    # Pinata IPFS Configuration
    VITE_PINATA_JWT=YOUR_PINATA_JWT_TOKEN
@@ -55,9 +55,38 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
    VITE_HASHCONNECT_APP_NAME=Hedera Gallery
    VITE_HASHCONNECT_APP_DESCRIPTION=Decentralized Media NFT Gallery
    VITE_HASHCONNECT_ICON_URL=https://your-domain.com/icon.png
+
+   # Deployed Contract and Collection IDs (will be set after deployment)
+   NFT_CONTRACT_ID=
+   NFT_COLLECTION_ID=
    ```
    
-5. Start the development server:
+5. **Deploy Smart Contract and Create NFT Collection**:
+   Navigate to the `smart_contract_minting` directory and deploy the NFT contract:
+   ```bash
+   cd smart_contract_minting
+   npx hardhat run scripts/deployHgalleryNFT.ts --network hederaTestnet
+   ```
+   Note the `HgalleryNFT deployed to: 0x...` address from the output. This is your `NFT_CONTRACT_ID`.
+   
+   Update your root `.env` file with the deployed contract ID:
+   ```env
+   NFT_CONTRACT_ID=0x... (your deployed contract ID)
+   ```
+
+   Now, navigate back to the root directory and create the NFT collection:
+   ```bash
+   cd ..
+   npm run create-collection
+   ```
+   Note the `Token ID: 0.0....` from the output. This is your `NFT_COLLECTION_ID`.
+
+   Update your root `.env` file with the NFT collection ID:
+   ```env
+   NFT_COLLECTION_ID=0.0.... (your created token ID)
+   ```
+
+6. Start the development server:
    ```bash
    npm run dev
    ```
