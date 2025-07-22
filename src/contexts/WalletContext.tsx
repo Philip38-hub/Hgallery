@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { ethers } from 'ethers';
 import { WalletConnection } from '@/types/hedera';
 import { hashConnectService, HashPackConnectionState } from '@/services/hashConnectService';
 import { toast } from '@/hooks/use-toast';
@@ -13,7 +12,6 @@ interface WalletContextType {
   isWalletConnected: boolean;
   signTransaction: (transaction: any) => Promise<any>;
   signMessage: (message: string) => Promise<string>;
-  getEthersProvider: () => ethers.BrowserProvider | null;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -108,18 +106,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const getEthersProvider = useCallback(() => {
-    if (hashConnectService.isWalletConnected()) {
-      // DAppConnector's internal provider can be used with ethers.BrowserProvider
-      // Assuming dappConnector.getProvider() or similar exists and returns a compatible provider
-      // If not, we might need to construct one from window.ethereum or similar
-      // For WalletConnect v2, the provider is usually accessible via the connector instance
-      // Let's assume hashConnectService.dappConnector.getProvider() exists or we can pass the raw provider
-      // Based on the DAppConnector source, it exposes a provider property
-      return new ethers.BrowserProvider(hashConnectService.getEthersProvider());
-    }
-    return null;
-  }, []);
 
   const value: WalletContextType = {
     wallet,
@@ -130,7 +116,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     signTransaction,
     signMessage,
     isWalletConnected: wallet?.isConnected || false,
-    getEthersProvider,
   };
 
   return (

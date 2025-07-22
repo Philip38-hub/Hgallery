@@ -57,7 +57,7 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
    VITE_HASHCONNECT_ICON_URL=https://your-domain.com/icon.png
 
    # Deployed Contract and Collection IDs (will be set after deployment)
-   NFT_CONTRACT_ID=
+   VITE_NFT_CONTRACT_ID=
    NFT_COLLECTION_ID=
    ```
    
@@ -67,11 +67,11 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
    cd smart_contract_minting
    npx hardhat run scripts/deployHgalleryNFT.ts --network hederaTestnet
    ```
-   Note the `HgalleryNFT deployed to: 0x...` address from the output. This is your `NFT_CONTRACT_ID`.
+   Note the `HgalleryNFT deployed to: 0x...` address from the output. This is your `VITE_NFT_CONTRACT_ID`.
    
    Update your root `.env` file with the deployed contract ID:
    ```env
-   NFT_CONTRACT_ID=0x... (your deployed contract ID)
+   VITE_NFT_CONTRACT_ID=0x... (your deployed contract ID)
    ```
 
    Now, navigate back to the root directory and create the NFT collection:

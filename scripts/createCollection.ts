@@ -15,14 +15,14 @@ async function createCollection() {
     const collectionName = "Hgallery NFT Collection";
     const collectionSymbol = "HGLRY";
     const treasuryAccountId = process.env.HEDERA_OPERATOR_ID; // Using operator ID as treasury for simplicity
-    const contractEvmAddress = process.env.NFT_CONTRACT_ID; // Assuming contract EVM address is available in .env
+    const contractEvmAddress = process.env.VITE_NFT_CONTRACT_ID; // Assuming contract EVM address is available in .env
 
     if (!treasuryAccountId) {
       throw new Error("HEDERA_OPERATOR_ID is not set in .env file.");
     }
 
     if (!contractEvmAddress) {
-      throw new Error("NFT_CONTRACT_ID (EVM address) is not set in .env file. Please deploy the contract first.");
+      throw new Error("VITE_NFT_CONTRACT_ID (EVM address) is not set in .env file. Please deploy the contract first.");
     }
 
     console.log(`Creating NFT collection "${collectionName}" with symbol "${collectionSymbol}"...`);

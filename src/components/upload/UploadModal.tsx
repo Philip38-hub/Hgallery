@@ -7,8 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Upload, X, File, Image, Video, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { ethers } from 'ethers';
-import HgalleryNFT_ABI from '../../../smart_contract_minting/artifacts/contracts/HgalleryNFT.sol/HgalleryNFT.json';
+import { ContractExecuteTransaction, ContractFunctionParameters, AccountId, ContractId } from '@hashgraph/sdk';
 import { useWallet } from '@/contexts/WalletContext';
 import { toast } from '@/hooks/use-toast';
 import { MediaMetadata, UploadProgress } from '@/types/hedera';
@@ -26,7 +25,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose, 
   onUploadComplete 
 }) => {
-  const { wallet, isWalletConnected, getEthersProvider } = useWallet();
+  const { wallet, isWalletConnected, signTransaction } = useWallet();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<Partial<MediaMetadata>>({
     title: '',
@@ -161,24 +160,31 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
       
       // Get contract address from environment
-      const nftContractAddress = import.meta.env.NFT_CONTRACT_ID;
+      const nftContractAddress = import.meta.env.VITE_NFT_CONTRACT_ID;
       if (!nftContractAddress) {
-        throw new Error('NFT Contract ID not configured. Please set NFT_CONTRACT_ID in your .env file.');
+        throw new Error('NFT Contract ID not configured. Please set VITE_NFT_CONTRACT_ID in your .env file.');
       }
 
-      // Connect to the contract
-      const ethersProvider = getEthersProvider();
-      if (!ethersProvider) {
-        throw new Error('Ethers provider not available. Please connect your wallet.');
-      }
-      const signer = await ethersProvider.getSigner();
-      const hgalleryNFT = new ethers.Contract(nftContractAddress, HgalleryNFT_ABI.abi, signer);
-
-      // Mint NFT
+      // Mint NFT using Hedera SDK
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
-      
-      const mintTx = await hgalleryNFT.mint(signer.address, metadataUpload.url);
-      await mintTx.wait(); // Wait for the transaction to be mined
+
+      if (!wallet?.accountId) {
+        throw new Error('Wallet account ID not found.');
+      }
+
+      const mintTx = new ContractExecuteTransaction()
+        .setContractId(ContractId.fromSolidityAddress(nftContractAddress).toString())
+        .setGas(2000000) // Increased gas limit
+        .setFunction("mint", new ContractFunctionParameters()
+          .addAddress(AccountId.fromString(wallet.accountId).toSolidityAddress())
+          .addString(metadataUpload.url)
+        );
+
+      const txId = await signTransaction(mintTx);
+
+      if (!txId) {
+        throw new Error('Transaction signing failed.');
+      }
 
       setUploadProgress(prev => prev ? { ...prev, progress: 100 } : null);
 
@@ -187,7 +193,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       
       toast({
         title: "Upload Successful!",
-        description: `Your media has been minted as NFT! Transaction hash: ${mintTx.hash}`,
+        description: `Your media has been minted as NFT! Transaction ID: ${txId.toString()}`,
       });
 
       setTimeout(() => {
@@ -208,7 +214,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       
       toast({
         title: "Upload Failed",
-        description: error instanceof Error ? error.message : "There was an error uploading your media. Please try again.",
+        description: error instanceof Error ? error.message : `Transaction failed with code: ${error.code}. Please check the console for details.`,
         variant: "destructive",
       });
     }
@@ -379,7 +385,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </div>
               {metadata.tags && metadata.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {metadata.tags.map((tag) => (
+                  {(metadata.tags || []).map((tag) => (
                     <Badge
                       key={tag}
                       variant="secondary"

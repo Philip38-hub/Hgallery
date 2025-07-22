@@ -74,14 +74,13 @@ export class HashConnectService {
   }
 
   private syncWithDAppConnectorContext() {
+    const session = this.dappConnector.walletConnectClient.session.values[0];
     const accountId = this.dappConnector.signers[0]?.getAccountId()?.toString();
-    // Network is assumed to be the one set during DAppConnector initialization
-    // or updated via specific events if they are correctly handled.
 
-    if (accountId) {
+    if (session && accountId) {
       this.state.isConnected = true;
       this.state.accountId = accountId;
-      // this.state.network remains as initialized or updated by other means
+      this.state.topic = session.topic;
     } else {
       this.state.isConnected = false;
       this.state.accountId = null;
@@ -116,19 +115,33 @@ export class HashConnectService {
 
   async signTransaction(transaction: Transaction): Promise<TransactionId | null> {
     try {
-      if (!this.state.isConnected || !this.state.accountId) {
-        throw new Error('Wallet not connected');
+      if (!this.state.isConnected || !this.state.accountId || !this.state.topic) {
+        throw new Error('Wallet not connected or session topic not found');
       }
 
-      const signer = this.dappConnector.signers[0];
-      if (!signer) {
-        throw new Error('No signer available');
-      }
+      // Set the transaction ID and node account IDs
+      transaction.setTransactionId(TransactionId.generate(this.state.accountId));
+      transaction.setNodeAccountIds([new AccountId(3)]); // For testnet
+      transaction.setTransactionMemo("Mint Hgallery NFT"); // Add a memo
+      
+      // Freeze the transaction
+      await transaction.freeze();
 
-      await transaction.freezeWithSigner(signer); // Use freezeWithSigner
-      const txResult = await transaction.executeWithSigner(signer);
+      const base64Tx = transactionToBase64String(transaction);
 
-      return txResult ? txResult.transactionId : null;
+      const result: any = await this.dappConnector.walletConnectClient.request({
+        topic: this.state.topic,
+        chainId: HederaChainId.Testnet,
+        request: {
+          method: HederaJsonRpcMethod.SignAndExecuteTransaction,
+          params: [base64Tx]
+        }
+      });
+
+      // The result from the wallet is the transaction response, which can be used to get the transaction ID
+      // Note: The actual structure of 'result' might need adjustment based on the wallet's response format.
+      // Assuming it returns an object with a transactionId property.
+      return TransactionId.fromString(result.transactionId);
     } catch (error) {
       console.error('Error signing transaction:', error);
       throw error;
