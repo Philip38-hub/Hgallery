@@ -180,6 +180,10 @@ export class HashConnectService {
   getNetwork(): string {
     return this.state.network;
   }
+
+  public getEthersProvider(): any { // Use 'any' for now to avoid strict type issues with WalletConnect's provider
+    return this.dappConnector;
+  }
 }
 
 export const hashConnectService = new HashConnectService();

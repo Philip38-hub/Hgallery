@@ -50,6 +50,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.0",
     "embla-carousel-react": "^8.3.0",
+    "ethers": "^6.15.0",
     "hashconnect": "^3.0.13",
     "input-otp": "^1.2.4",
     "ipfs-http-client": "^60.0.1",

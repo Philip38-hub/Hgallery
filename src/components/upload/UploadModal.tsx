@@ -7,11 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Upload, X, File, Image, Video, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ethers } from 'ethers';
+import HgalleryNFT_ABI from '../../../smart_contract_minting/artifacts/contracts/HgalleryNFT.sol/HgalleryNFT.json';
 import { useWallet } from '@/contexts/WalletContext';
 import { toast } from '@/hooks/use-toast';
 import { MediaMetadata, UploadProgress } from '@/types/hedera';
 import { ipfsService } from '@/services/ipfsService';
-import { hederaService } from '@/services/hederaService';
+import { hederaService } from '@/services/hederaService'; // Keep for Hedera types if needed, but minting will change
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -24,7 +26,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose, 
   onUploadComplete 
 }) => {
-  const { wallet, isWalletConnected } = useWallet();
+  const { wallet, isWalletConnected, getEthersProvider } = useWallet();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<Partial<MediaMetadata>>({
     title: '',
@@ -158,20 +160,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       // Mint NFT on Hedera
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
       
-      // In a production environment, you would either create a new collection
-      // or use an existing one. For this example, we'll use a configurable token ID.
-      const collectionTokenId = import.meta.env.VITE_HEDERA_COLLECTION_TOKEN_ID;
-
-      if (!collectionTokenId) {
-        throw new Error('Hedera Collection Token ID not configured. Please set VITE_HEDERA_COLLECTION_TOKEN_ID in your .env file.');
+      // Get contract address from environment
+      const nftContractAddress = import.meta.env.NFT_CONTRACT_ID;
+      if (!nftContractAddress) {
+        throw new Error('NFT Contract ID not configured. Please set NFT_CONTRACT_ID in your .env file.');
       }
+
+      // Connect to the contract
+      const ethersProvider = getEthersProvider();
+      if (!ethersProvider) {
+        throw new Error('Ethers provider not available. Please connect your wallet.');
+      }
+      const signer = await ethersProvider.getSigner();
+      const hgalleryNFT = new ethers.Contract(nftContractAddress, HgalleryNFT_ABI.abi, signer);
+
+      // Mint NFT
+      setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
       
-      const mintResult = await hederaService.mintNFT(
-        collectionTokenId,
-        nftMetadata,
-        wallet.accountId
-      );
-      
+      const mintTx = await hgalleryNFT.mint(signer.address, metadataUpload.url);
+      await mintTx.wait(); // Wait for the transaction to be mined
+
       setUploadProgress(prev => prev ? { ...prev, progress: 100 } : null);
 
       // Complete
@@ -179,11 +187,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       
       toast({
         title: "Upload Successful!",
-        description: `Your media has been minted as NFT ${mintResult.tokenId}#${mintResult.serialNumber}`,
+        description: `Your media has been minted as NFT! Transaction hash: ${mintTx.hash}`,
       });
 
       setTimeout(() => {
-        onUploadComplete?.(mintResult.tokenId);
+        // We don't get tokenId directly from the mint function,
+        // but we can infer it or fetch it from a mirror node later.
+        // For now, we'll just close the modal.
+        onUploadComplete?.(''); // Pass empty string or handle tokenId differently
         handleClose();
       }, 2000);
 
