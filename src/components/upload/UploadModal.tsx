@@ -14,6 +14,7 @@ import { MediaMetadata, UploadProgress } from '@/types/hedera';
 import { ipfsService } from '@/services/ipfsService';
 import { hederaClientService } from '@/services/hederaClientService';
 import { backendService } from '@/services/backendService';
+import { nftMintingService } from '@/services/nftMintingService';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -21,12 +22,12 @@ interface UploadModalProps {
   onUploadComplete?: (tokenId: string) => void;
 }
 
-export const UploadModal: React.FC<UploadModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onUploadComplete 
+export const UploadModal: React.FC<UploadModalProps> = ({
+  isOpen,
+  onClose,
+  onUploadComplete
 }) => {
-  const { wallet, isWalletConnected } = useWallet();
+  const { wallet, isWalletConnected, signTransaction } = useWallet();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<Partial<MediaMetadata>>({
     title: '',
@@ -157,50 +158,66 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       const metadataUpload = await ipfsService.uploadMetadata(nftMetadata);
       setUploadProgress(prev => prev ? { ...prev, progress: 60 } : null);
 
-      // Mint NFT using backend API
+      // Mint NFT using proper transaction signing flow
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
 
-      console.log('Minting NFT with metadata URL:', metadataUpload.url);
+      // Convert gateway URL to IPFS URL format for backend
+      const ipfsUrl = `ipfs://${metadataUpload.hash}`;
+      console.log('Minting NFT with metadata URL:', ipfsUrl);
 
-      const mintResponse = await backendService.mintNFT({
-        metadataUrl: metadataUpload.url,
-        userAccountId: wallet.accountId
-      });
+      setUploadProgress(prev => prev ? { ...prev, progress: 25 } : null);
 
-      if (!mintResponse.success) {
-        throw new Error(mintResponse.error || 'Failed to mint NFT');
-      }
+      // Use hybrid approach: Backend mints to treasury, user signs transfer
+      const mintResult = await nftMintingService.mintAndTransferNFT(
+        ipfsUrl,
+        wallet.accountId,
+        { signTransaction } // Pass the signTransaction function
+      );
 
       setUploadProgress(prev => prev ? { ...prev, progress: 100 } : null);
 
       // Complete
       setUploadProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
 
-      const nftData = mintResponse.data!;
-
       toast({
         title: "NFT Minted Successfully!",
-        description: `Your NFT #${nftData.serialNumber} has been minted and ${nftData.transferred ? 'transferred to your account' : 'is ready for transfer'}!`,
+        description: `Your NFT #${mintResult.serialNumber} has been minted and transferred to your account!`,
       });
 
-      console.log('NFT minted successfully:', nftData);
+      console.log('NFT minted and transferred successfully:', mintResult);
 
       setTimeout(() => {
-        onUploadComplete?.(nftData.tokenId);
+        onUploadComplete?.(mintResult.tokenId);
         handleClose();
       }, 2000);
 
     } catch (error) {
       console.error('Upload error:', error);
+
+      let errorMessage = 'Failed to upload and mint NFT. Please try again.';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Handle specific error cases
+        if (error.message.includes('User rejected')) {
+          errorMessage = 'Transaction was cancelled by user.';
+        } else if (error.message.includes('insufficient')) {
+          errorMessage = 'Insufficient HBAR balance for transaction fees.';
+        } else if (error.message.includes('not associated')) {
+          errorMessage = 'Please associate your account with the token first.';
+        }
+      }
+
       setUploadProgress(prev => prev ? {
         ...prev,
         status: 'error',
-        error: error instanceof Error ? error.message : 'Upload failed. Please try again.'
+        error: errorMessage
       } : null);
 
       toast({
         title: "Upload Failed",
-        description: error instanceof Error ? error.message : 'Failed to upload and mint NFT. Please try again.',
+        description: errorMessage,
         variant: "destructive",
       });
     }

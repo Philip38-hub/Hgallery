@@ -144,39 +144,71 @@ export class HashConnectService {
     }
   }
 
-  async signTransaction(transaction: Transaction): Promise<TransactionId | null> {
+  async signTransaction(transaction: any): Promise<any> {
     try {
       if (!this.state.isConnected || !this.state.accountId) {
         throw new Error('Wallet not connected');
       }
 
       console.log('Preparing transaction for signing...');
+      console.log('Transaction type:', transaction.constructor.name);
+      console.log('Transaction frozen status:', transaction.isFrozen());
 
-      // Set the transaction ID and node account IDs
-      transaction.setTransactionId(TransactionId.generate(this.state.accountId));
-      transaction.setNodeAccountIds([new AccountId(3)]); // For testnet
-      transaction.setTransactionMemo("Mint Hgallery NFT");
+      const userAccountId = AccountId.fromString(this.state.accountId);
 
-      // Freeze the transaction
-      transaction.freeze();
-
-      console.log('Transaction prepared:', {
-        transactionId: transaction.transactionId?.toString(),
-        nodeAccountIds: transaction.nodeAccountIds?.map(id => id.toString()),
-        memo: transaction.transactionMemo
+      // HashConnect will handle transaction preparation, so we don't modify it
+      console.log('Transaction details:', {
+        isFrozen: transaction.isFrozen(),
+        hasTransactionId: !!transaction.transactionId,
+        hasNodeAccountIds: !!transaction.nodeAccountIds && transaction.nodeAccountIds.length > 0,
+        accountId: this.state.accountId
       });
 
-      console.log('Signing transaction with HashConnect...');
+      console.log('Sending transaction to HashConnect for signing...');
 
-      // Use HashConnect v3 API - sendTransaction takes AccountId and Transaction
-      const accountId = AccountId.fromString(this.state.accountId);
-      const result = await this.hashconnect.sendTransaction(accountId, transaction);
+      try {
+        // Use HashConnect v3 API
+        const result = await this.hashconnect.sendTransaction(userAccountId, transaction);
 
-      console.log('Transaction signed and executed:', result);
+        console.log('Transaction result from HashConnect:', result);
+        console.log('Result type:', typeof result);
+        console.log('Result keys:', result ? Object.keys(result) : 'null');
+        console.log('Transaction executed successfully');
 
-      // The result should contain the transaction receipt
-      // Return the original transaction ID since it was successfully executed
-      return transaction.transactionId!;
+        // Return the transaction ID as string
+        const txId = transaction.transactionId?.toString() || 'unknown';
+        console.log('Returning transaction ID:', txId);
+        return txId;
+
+      } catch (hashConnectError) {
+        console.error('HashConnect sendTransaction error:', hashConnectError);
+        console.error('Error type:', typeof hashConnectError);
+        console.error('Error keys:', Object.keys(hashConnectError));
+
+        // Get error message safely
+        let errorMessage = 'Unknown error';
+        if (hashConnectError && typeof hashConnectError === 'object') {
+          if (typeof hashConnectError.message === 'string') {
+            errorMessage = hashConnectError.message;
+          } else if (hashConnectError.toString) {
+            errorMessage = hashConnectError.toString();
+          } else {
+            errorMessage = JSON.stringify(hashConnectError);
+          }
+        }
+
+        console.error('Extracted error message:', errorMessage);
+
+        // Check for specific error types
+        if (errorMessage.toLowerCase().includes('user rejected') ||
+            errorMessage.toLowerCase().includes('rejected')) {
+          throw new Error('Transaction was rejected by user');
+        } else if (errorMessage.toLowerCase().includes('insufficient')) {
+          throw new Error('Insufficient HBAR balance for transaction fees');
+        } else {
+          throw new Error(`HashConnect error: ${errorMessage}`);
+        }
+      }
 
     } catch (error) {
       console.error('Error signing transaction:', error);
