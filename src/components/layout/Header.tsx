@@ -8,7 +8,7 @@ import { useWallet } from '@/contexts/WalletContext';
 import { useState } from 'react';
 
 interface HeaderProps {
-  onUploadClick: () => void;
+  onUploadClick?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
@@ -55,6 +55,14 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
               >
                 My Content
               </Link>
+              <Link
+                to="/mint"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  location.pathname === '/mint' ? 'text-primary' : 'text-muted-foreground'
+                }`}
+              >
+                Mint NFT
+              </Link>
             </nav>
           )}
 
@@ -64,8 +72,8 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
             Testnet
           </Badge>
 
-          {/* Upload Button - Only for connected wallets */}
-          {isWalletConnected && (
+          {/* Upload Button - Only for connected wallets and when onUploadClick is provided */}
+          {isWalletConnected && onUploadClick && (
             <Button
               onClick={onUploadClick}
               className="bg-gradient-accent text-accent-foreground shadow-accent hover:shadow-accent/70 transition-all duration-300"

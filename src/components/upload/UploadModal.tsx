@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { MediaMetadata, UploadProgress } from '@/types/hedera';
 import { ipfsService } from '@/services/ipfsService';
 import { hederaClientService } from '@/services/hederaClientService';
+import { backendService } from '@/services/backendService';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -115,7 +116,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }));
   };
 
-  const simulateUpload = async () => {
+  const handleUpload = async () => {
     if (!selectedFile || !isWalletConnected || !wallet) {
       return;
     }
@@ -129,92 +130,77 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     try {
       // Upload file to IPFS
-      setUploadProgress(prev => prev ? { ...prev, progress: 25 } : null);
+      setUploadProgress(prev => prev ? { ...prev, progress: 20 } : null);
       const fileUpload = await ipfsService.uploadFile(selectedFile);
-      
-      setUploadProgress(prev => prev ? { ...prev, progress: 50 } : null);
-      
+
+      setUploadProgress(prev => prev ? { ...prev, progress: 40 } : null);
+
       // Create metadata and upload to IPFS
       const nftMetadata = {
         name: metadata.title || '',
         description: metadata.description || '',
         image: fileUpload.url,
-        type: metadata.mediaType || 'image', // Re-added for HederaService
+        type: metadata.mediaType || 'image',
         attributes: (metadata.tags || []).map(tag => ({
           trait_type: 'Tag',
           value: tag
         })),
         properties: {
           creator: wallet.accountId,
-          tags: metadata.tags || [], // Keep tags for Hedera's properties
+          tags: metadata.tags || [],
           originalFileName: metadata.originalFileName || selectedFile.name,
           fileSize: selectedFile.size,
           uploadDate: new Date().toISOString()
         }
       };
-      
-      const metadataUpload = await ipfsService.uploadMetadata(nftMetadata);
-      setUploadProgress(prev => prev ? { ...prev, progress: 75 } : null);
 
-      // Prepare NFT metadata for minting
+      const metadataUpload = await ipfsService.uploadMetadata(nftMetadata);
+      setUploadProgress(prev => prev ? { ...prev, progress: 60 } : null);
+
+      // Mint NFT using backend API
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
 
-      // Get NFT collection configuration from environment
-      const nftCollectionId = import.meta.env.VITE_NFT_COLLECTION_ID;
+      console.log('Minting NFT with metadata URL:', metadataUpload.url);
 
-      if (!nftCollectionId) {
-        throw new Error('NFT Collection ID not configured. Please set VITE_NFT_COLLECTION_ID in your .env file.');
-      }
-
-      if (!wallet?.accountId) {
-        throw new Error('Wallet account ID not found.');
-      }
-
-      // Check if token is associated with user account
-      setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 25 } : null);
-
-      const isAssociated = await hederaClientService.isTokenAssociated(nftCollectionId, wallet.accountId);
-
-      if (!isAssociated) {
-        throw new Error(`Token ${nftCollectionId} is not associated with your account. Please associate the token first.`);
-      }
-
-      // For now, we'll just prepare the metadata and show success
-      // In a production app, you would send this to a backend service for minting
-      setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 75 } : null);
-
-      console.log('NFT metadata prepared for minting:', {
-        collectionId: nftCollectionId,
+      const mintResponse = await backendService.mintNFT({
         metadataUrl: metadataUpload.url,
-        userAccount: wallet.accountId
+        userAccountId: wallet.accountId
       });
+
+      if (!mintResponse.success) {
+        throw new Error(mintResponse.error || 'Failed to mint NFT');
+      }
 
       setUploadProgress(prev => prev ? { ...prev, progress: 100 } : null);
 
       // Complete
       setUploadProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
 
+      const nftData = mintResponse.data!;
+
       toast({
-        title: "Upload Successful!",
-        description: `Your media has been uploaded to IPFS and metadata prepared for NFT minting!`,
+        title: "NFT Minted Successfully!",
+        description: `Your NFT #${nftData.serialNumber} has been minted and ${nftData.transferred ? 'transferred to your account' : 'is ready for transfer'}!`,
       });
 
+      console.log('NFT minted successfully:', nftData);
+
       setTimeout(() => {
-        onUploadComplete?.(nftCollectionId);
+        onUploadComplete?.(nftData.tokenId);
         handleClose();
       }, 2000);
 
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadProgress(prev => prev ? { 
-        ...prev, 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Upload failed. Please try again.' 
+      setUploadProgress(prev => prev ? {
+        ...prev,
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Upload failed. Please try again.'
       } : null);
-      
+
       toast({
         title: "Upload Failed",
-        description: error instanceof Error ? error.message : `Transaction failed with code: ${error.code}. Please check the console for details.`,
+        description: error instanceof Error ? error.message : 'Failed to upload and mint NFT. Please try again.',
         variant: "destructive",
       });
     }
@@ -418,7 +404,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             
             {uploadProgress?.status !== 'completed' && (
               <Button
-                onClick={simulateUpload}
+                onClick={handleUpload}
                 disabled={!isFormValid || !!uploadProgress}
                 className="flex-1 bg-gradient-primary text-primary-foreground shadow-primary hover:shadow-primary/70"
               >
