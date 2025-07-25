@@ -1,44 +1,40 @@
 import { AccountId, LedgerId, Transaction, TransactionId } from '@hashgraph/sdk';
-import { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId, transactionToBase64String } from "@hashgraph/hedera-wallet-connect";
-import { SignClientTypes } from "@walletconnect/types";
+import { HashConnect, HashConnectConnectionState, SessionData } from 'hashconnect';
 import EventEmitter from "events";
 
 export interface HashPackConnectionState {
   isConnected: boolean;
   accountId: string | null;
   network: string;
-  topic: string; // This might not be directly used with DAppConnector, but keeping for compatibility
-  pairingString: string; // This might not be directly used with DAppConnector, but keeping for compatibility
+  topic: string;
+  pairingString: string;
 }
 
-// Create a new project in walletconnect cloud to generate a project id
-// You will need to replace this with your own project ID from WalletConnect Cloud
-const WALLETCONNECT_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "YOUR_WALLETCONNECT_PROJECT_ID";
-
-// Created refreshEvent because `dappConnector.walletConnectClient.on(eventName, syncWithWalletConnectContext)` would not call syncWithWalletConnectContext
+// Create a global event emitter for refresh events
 const refreshEvent = new EventEmitter();
 
 export class HashConnectService {
-  private dappConnector: DAppConnector;
-  private appMetadata: SignClientTypes.Metadata;
+  private hashconnect: HashConnect;
   private state: HashPackConnectionState;
   private listeners: ((state: HashPackConnectionState) => void)[] = [];
+  private pairingData: SessionData | null = null;
+  private appMetadata = {
+    name: import.meta.env.VITE_HASHCONNECT_APP_NAME || 'Hedera Gallery',
+    description: import.meta.env.VITE_HASHCONNECT_APP_DESCRIPTION || 'Decentralized Media NFT Gallery',
+    icons: [import.meta.env.VITE_HASHCONNECT_ICON_URL || '/favicon.ico'],
+    url: window.location.origin
+  };
 
   constructor() {
-    this.appMetadata = {
-      name: import.meta.env.VITE_HASHCONNECT_APP_NAME || 'Hedera Gallery',
-      description: import.meta.env.VITE_HASHCONNECT_APP_DESCRIPTION || 'Decentralized Media NFT Gallery',
-      url: window.location.origin,
-      icons: [import.meta.env.VITE_HASHCONNECT_ICON_URL || '/favicon.ico'],
-    };
+    // Get WalletConnect project ID from environment
+    const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'e8565b8bf2f3b8970efb537891f65f96';
 
-    this.dappConnector = new DAppConnector(
+    // Create HashConnect instance with correct v3 constructor
+    this.hashconnect = new HashConnect(
+      LedgerId.TESTNET,
+      projectId,
       this.appMetadata,
-      LedgerId.TESTNET, // Assuming testnet for now, can be dynamic
-      WALLETCONNECT_PROJECT_ID,
-      Object.values(HederaJsonRpcMethod),
-      [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-      [HederaChainId.Testnet], // Assuming testnet for now, can be dynamic
+      true // debug mode
     );
 
     this.state = {
@@ -49,141 +45,151 @@ export class HashConnectService {
       pairingString: ''
     };
 
-    this.initializeDAppConnector();
+    // Don't setup event listeners in constructor, do it in init
   }
 
-  private async initializeDAppConnector() {
-    try {
-      await this.dappConnector.init();
+  private setupEventListeners() {
+    // Listen for pairing events
+    this.hashconnect.pairingEvent.on((pairingData) => {
+      console.log('Pairing event:', pairingData);
+      this.pairingData = pairingData;
 
-      // Set up event listeners
-      // Removed problematic event listeners for AccountsChanged and ChainChanged
-      // as they cause type errors and state syncing is handled by syncWithDAppConnectorContext
-      // called after init, openModal, and disconnectAll.
-      this.dappConnector.walletConnectClient.on("session_delete", () => {
-        console.log('Session deleted event');
-        this.syncWithDAppConnectorContext();
-      });
+      // Update state with pairing information
+      if (pairingData.accountIds && pairingData.accountIds.length > 0) {
+        this.state.accountId = pairingData.accountIds[0];
+        this.state.isConnected = true;
+      }
+      this.state.network = pairingData.network || 'testnet';
+      this.notifyListeners();
+    });
 
-      // Initial sync
-      this.syncWithDAppConnectorContext();
+    // Listen for connection status changes
+    this.hashconnect.connectionStatusChangeEvent.on((connectionStatus) => {
+      console.log('Connection status changed:', connectionStatus);
 
-    } catch (error) {
-      console.error('Error initializing DAppConnector:', error);
-    }
-  }
+      // Update connection state based on HashConnect v3 enum
+      this.state.isConnected = connectionStatus === HashConnectConnectionState.Connected ||
+                               connectionStatus === HashConnectConnectionState.Paired;
 
-  private syncWithDAppConnectorContext() {
-    const session = this.dappConnector.walletConnectClient.session.values[0];
-    const accountId = this.dappConnector.signers[0]?.getAccountId()?.toString();
+      if (!this.state.isConnected) {
+        this.state.accountId = null;
+        this.pairingData = null;
+      }
 
-    if (session && accountId) {
-      this.state.isConnected = true;
-      this.state.accountId = accountId;
-      this.state.topic = session.topic;
-    } else {
+      this.notifyListeners();
+    });
+
+    // Listen for disconnection events
+    this.hashconnect.disconnectionEvent.on((data) => {
+      console.log('Disconnection event:', data);
       this.state.isConnected = false;
       this.state.accountId = null;
-      this.state.network = 'testnet'; // Default to testnet if disconnected
+      this.pairingData = null;
+      this.notifyListeners();
+    });
+  }
+
+  async initializeConnection(): Promise<void> {
+    try {
+      console.log('Initializing HashConnect...');
+
+      // Setup event listeners before initialization
+      this.setupEventListeners();
+
+      // Initialize HashConnect (v3 takes no parameters)
+      await this.hashconnect.init();
+
+      console.log('HashConnect initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize HashConnect:', error);
+      throw error;
     }
-    this.notifyListeners();
   }
 
   async connectWallet(): Promise<void> {
     try {
-      if (this.state.isConnected) {
-        return;
-      }
+      console.log('Connecting to wallet...');
 
-      await this.dappConnector.openModal();
-      this.syncWithDAppConnectorContext(); // Sync after modal closes
+      // In v3, use openPairingModal to initiate connection
+      // This will automatically detect and connect to HashPack extension if available
+      this.hashconnect.openPairingModal();
+
+      console.log('Wallet connection modal opened');
     } catch (error) {
-      console.error('Error connecting wallet:', error);
-      throw new Error('Failed to connect to WalletConnect wallet');
+      console.error('Failed to connect to wallet:', error);
+      throw error;
     }
   }
 
   async disconnectWallet(): Promise<void> {
     try {
-      await this.dappConnector.disconnectAll();
-      this.syncWithDAppConnectorContext(); // Sync after disconnection
+      console.log('Disconnecting wallet...');
+
+      // In v3, use disconnect() without parameters
+      this.hashconnect.disconnect();
+
+      // Reset state
+      this.state = {
+        isConnected: false,
+        accountId: null,
+        network: 'testnet',
+        topic: '',
+        pairingString: ''
+      };
+      this.pairingData = null;
+      this.notifyListeners();
     } catch (error) {
-      console.error('Error disconnecting wallet:', error);
+      console.error('Failed to disconnect wallet:', error);
       throw error;
     }
   }
 
   async signTransaction(transaction: Transaction): Promise<TransactionId | null> {
     try {
-      if (!this.state.isConnected || !this.state.accountId || !this.state.topic) {
-        throw new Error('Wallet not connected or session topic not found');
+      if (!this.state.isConnected || !this.state.accountId) {
+        throw new Error('Wallet not connected');
       }
+
+      console.log('Preparing transaction for signing...');
 
       // Set the transaction ID and node account IDs
       transaction.setTransactionId(TransactionId.generate(this.state.accountId));
       transaction.setNodeAccountIds([new AccountId(3)]); // For testnet
-      transaction.setTransactionMemo("Mint Hgallery NFT"); // Add a memo
-      
+      transaction.setTransactionMemo("Mint Hgallery NFT");
+
       // Freeze the transaction
-      await transaction.freeze();
+      transaction.freeze();
 
-      const base64Tx = transactionToBase64String(transaction);
-
-      const result: any = await this.dappConnector.walletConnectClient.request({
-        topic: this.state.topic,
-        chainId: HederaChainId.Testnet,
-        request: {
-          method: HederaJsonRpcMethod.SignAndExecuteTransaction,
-          params: [base64Tx]
-        }
+      console.log('Transaction prepared:', {
+        transactionId: transaction.transactionId?.toString(),
+        nodeAccountIds: transaction.nodeAccountIds?.map(id => id.toString()),
+        memo: transaction.transactionMemo
       });
 
-      // The result from the wallet is the transaction response, which can be used to get the transaction ID
-      // Note: The actual structure of 'result' might need adjustment based on the wallet's response format.
-      // Assuming it returns an object with a transactionId property.
-      return TransactionId.fromString(result.transactionId);
+      console.log('Signing transaction with HashConnect...');
+
+      // Use HashConnect v3 API - sendTransaction takes AccountId and Transaction
+      const accountId = AccountId.fromString(this.state.accountId);
+      const result = await this.hashconnect.sendTransaction(accountId, transaction);
+
+      console.log('Transaction signed and executed:', result);
+
+      // The result should contain the transaction receipt
+      // Return the original transaction ID since it was successfully executed
+      return transaction.transactionId!;
+
     } catch (error) {
       console.error('Error signing transaction:', error);
       throw error;
     }
   }
 
-  async signMessage(message: string): Promise<string> {
-    // DAppConnector does not have a direct 'sign message' method like HashConnect v1.
-    // Message signing might need to be implemented using a custom RPC method or
-    // by leveraging the underlying WalletConnect client if supported.
-    // For now, throwing an error as it's not directly available in the template's DAppConnector usage.
-    throw new Error('Message signing is not directly supported by DAppConnector in this implementation.');
-  }
-
   getState(): HashPackConnectionState {
     return { ...this.state };
   }
 
-  getPairingString(): string {
-    // Pairing string is not directly exposed in DAppConnector in the same way as HashConnect v1
-    // The modal handles the pairing.
-    return "Pairing handled by WalletConnect modal.";
-  }
-
-  onStateChange(callback: (state: HashPackConnectionState) => void): () => void {
-    this.listeners.push(callback);
-    
-    // Return unsubscribe function
-    return () => {
-      const index = this.listeners.indexOf(callback);
-      if (index > -1) {
-        this.listeners.splice(index, 1);
-      }
-    };
-  }
-
-  private notifyListeners() {
-    this.listeners.forEach(listener => listener(this.getState()));
-  }
-
   isWalletConnected(): boolean {
-    return this.state.isConnected;
+    return this.state.isConnected && !!this.state.accountId;
   }
 
   getAccountId(): string | null {
@@ -194,9 +200,40 @@ export class HashConnectService {
     return this.state.network;
   }
 
-  public getEthersProvider(): any { // Use 'any' for now to avoid strict type issues with WalletConnect's provider
-    return this.dappConnector;
+  getPairingString(): string {
+    return this.state.pairingString;
+  }
+
+  addListener(listener: (state: HashPackConnectionState) => void): void {
+    this.listeners.push(listener);
+  }
+
+  removeListener(listener: (state: HashPackConnectionState) => void): void {
+    const index = this.listeners.indexOf(listener);
+    if (index > -1) {
+      this.listeners.splice(index, 1);
+    }
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => listener(this.getState()));
+  }
+
+  // Placeholder for message signing (not commonly used in Hedera)
+  async signMessage(_message: string): Promise<string> {
+    throw new Error('Message signing not implemented for HashConnect');
+  }
+
+  // Static method to get or create singleton instance
+  private static instance: HashConnectService | null = null;
+
+  static getInstance(): HashConnectService {
+    if (!HashConnectService.instance) {
+      HashConnectService.instance = new HashConnectService();
+    }
+    return HashConnectService.instance;
   }
 }
 
-export const hashConnectService = new HashConnectService();
+// Export singleton instance
+export const hashConnectService = HashConnectService.getInstance();

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { WalletConnection } from '@/types/hedera';
 import { hashConnectService, HashPackConnectionState } from '@/services/hashConnectService';
 import { toast } from '@/hooks/use-toast';
@@ -97,13 +97,26 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   };
   // Check for existing connection on mount
   useEffect(() => {
-    // Set up HashConnect state listener
-    const unsubscribe = hashConnectService.onStateChange(updateWalletState);
-    
-    // Initialize with current state
-    updateWalletState(hashConnectService.getState());
-    
-    return unsubscribe;
+    // Initialize HashConnect
+    const initializeHashConnect = async () => {
+      try {
+        await hashConnectService.initializeConnection();
+        // Set up HashConnect state listener
+        hashConnectService.addListener(updateWalletState);
+
+        // Initialize with current state
+        updateWalletState(hashConnectService.getState());
+      } catch (error) {
+        console.error('Failed to initialize HashConnect:', error);
+      }
+    };
+
+    initializeHashConnect();
+
+    // Cleanup function
+    return () => {
+      hashConnectService.removeListener(updateWalletState);
+    };
   }, []);
 
 
