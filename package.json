@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "create-collection": "tsx scripts/createCollection.ts"
+    "create-collection": "tsx scripts/createCollection.ts",
+    "test-nft": "tsx scripts/testNFTMinting.ts"
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.68.0",
