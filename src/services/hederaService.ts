@@ -18,15 +18,13 @@ import {
   NftId, // Added NftId import
   ContractInfoQuery // Added ContractInfoQuery import
 } from '@hashgraph/sdk';
-import dotenv from 'dotenv'; // Import dotenv
-import { fileURLToPath } from 'url'; // Import fileURLToPath
-import { dirname } from 'path'; // Import dirname
-import * as path from 'path'; // Import path
+// Server-side only service - requires Node.js environment
+import dotenv from 'dotenv';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') }); // Load environment variables from root .env
+// Load environment variables for server-side scripts
+if (typeof window === 'undefined') {
+  dotenv.config();
+}
 
 export interface TokenCreationResult {
   tokenId: string;
@@ -57,17 +55,23 @@ export class HederaService {
   private operatorId: AccountId;
   private operatorKey: PrivateKey;
 
-  constructor() {
-    const network = process.env.HEDERA_NETWORK || 'testnet';
-    const operatorId = process.env.HEDERA_OPERATOR_ID;
-    const operatorKey = process.env.HEDERA_OPERATOR_KEY;
-
-    if (!operatorId || !operatorKey) {
-      throw new Error('Hedera operator credentials not configured');
+  constructor(operatorId?: string, operatorKey?: string) {
+    // This service should only be used server-side with explicit credentials
+    // For browser use, use HederaClientService instead
+    if (typeof window !== 'undefined') {
+      throw new Error('HederaService should not be used in browser environment. Use HederaClientService instead.');
     }
 
-    this.operatorId = AccountId.fromString(operatorId);
-    this.operatorKey = PrivateKey.fromStringECDSA(operatorKey); // Assuming ECDSA key
+    const network = process.env.HEDERA_NETWORK || 'testnet';
+    const opId = operatorId || process.env.HEDERA_OPERATOR_ID;
+    const opKey = operatorKey || process.env.HEDERA_OPERATOR_KEY;
+
+    if (!opId || !opKey) {
+      throw new Error('Hedera operator credentials not configured. Please set HEDERA_OPERATOR_ID and HEDERA_OPERATOR_KEY.');
+    }
+
+    this.operatorId = AccountId.fromString(opId);
+    this.operatorKey = PrivateKey.fromStringECDSA(opKey);
 
     if (network === 'mainnet') {
       this.client = Client.forMainnet();
@@ -86,20 +90,28 @@ export class HederaService {
     name: string,
     symbol: string,
     treasuryAccountId: string,
-    supplyKey?: PrivateKey | PublicKey // Changed to PublicKey
+    supplyKey?: PrivateKey | PublicKey,
+    maxSupply?: number
   ): Promise<string> {
     try {
+      // Follow Hedera best practices for NFT collections
       const tokenCreateTx = new TokenCreateTransaction()
         .setTokenName(name)
         .setTokenSymbol(symbol)
         .setTokenType(TokenType.NonFungibleUnique)
-        .setSupplyType(TokenSupplyType.Infinite)
+        .setSupplyType(maxSupply ? TokenSupplyType.Finite : TokenSupplyType.Infinite)
         .setInitialSupply(0)
         .setTreasuryAccountId(treasuryAccountId)
-        .setSupplyKey(supplyKey || this.operatorKey) // Use provided supplyKey or operatorKey
+        .setSupplyKey(supplyKey || this.operatorKey)
         .setAdminKey(this.operatorKey)
-        .setMaxTransactionFee(new Hbar(30))
-        .freezeWith(this.client);
+        .setMaxTransactionFee(new Hbar(30));
+
+      // Set max supply if provided (recommended for finite collections)
+      if (maxSupply) {
+        tokenCreateTx.setMaxSupply(maxSupply);
+      }
+
+      tokenCreateTx.freezeWith(this.client);
 
       const tokenCreateSign = await tokenCreateTx.sign(this.operatorKey);
       const tokenCreateSubmit = await tokenCreateSign.execute(this.client);
@@ -119,12 +131,13 @@ export class HederaService {
 
   async mintNFT(
     tokenId: string,
-    metadata: NFTMetadata,
-    accountId: string
+    metadataUrl: string,
+    supplyKey: PrivateKey
   ): Promise<TokenCreationResult> {
     try {
-      // Convert metadata to bytes
-      const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata));
+      // Following Hedera best practices: use IPFS URL as metadata
+      // The metadata should be a URL pointing to the JSON metadata file on IPFS
+      const metadataBytes = new TextEncoder().encode(metadataUrl);
 
       const mintTx = new TokenMintTransaction()
         .setTokenId(tokenId)
@@ -132,7 +145,8 @@ export class HederaService {
         .setMaxTransactionFee(new Hbar(20))
         .freezeWith(this.client);
 
-      const mintTxSign = await mintTx.sign(this.operatorKey);
+      // Sign with the supply key (required for minting)
+      const mintTxSign = await mintTx.sign(supplyKey);
       const mintTxSubmit = await mintTxSign.execute(this.client);
       const mintRx = await mintTxSubmit.getReceipt(this.client);
 
@@ -157,6 +171,7 @@ export class HederaService {
       const associateTx = new TokenAssociateTransaction()
         .setAccountId(accountId)
         .setTokenIds([tokenId])
+        .setMaxTransactionFee(new Hbar(5))
         .freezeWith(this.client);
 
       const associateTxSign = await associateTx.sign(PrivateKey.fromString(privateKey));
@@ -164,6 +179,39 @@ export class HederaService {
       await associateTxSubmit.getReceipt(this.client);
     } catch (error) {
       console.error('Error associating token:', error);
+      throw error;
+    }
+  }
+
+  // Check if an account is already associated with a token
+  async isTokenAssociated(tokenId: string, accountId: string): Promise<boolean> {
+    try {
+      const balance = await new AccountBalanceQuery()
+        .setAccountId(accountId)
+        .execute(this.client);
+
+      // Check if the token exists in the account's token map
+      return balance.tokens.has(TokenId.fromString(tokenId));
+    } catch (error) {
+      console.error('Error checking token association:', error);
+      return false;
+    }
+  }
+
+  // Helper method to ensure token association before minting
+  async ensureTokenAssociation(tokenId: string, accountId: string, privateKey: string): Promise<void> {
+    try {
+      const isAssociated = await this.isTokenAssociated(tokenId, accountId);
+
+      if (!isAssociated) {
+        console.log(`Associating token ${tokenId} with account ${accountId}...`);
+        await this.associateToken(tokenId, accountId, privateKey);
+        console.log(`Token association completed successfully.`);
+      } else {
+        console.log(`Token ${tokenId} is already associated with account ${accountId}.`);
+      }
+    } catch (error) {
+      console.error('Error ensuring token association:', error);
       throw error;
     }
   }
@@ -223,7 +271,21 @@ export class HederaService {
 
       const nft = nftInfo[0];
       const metadataString = new TextDecoder().decode(nft.metadata);
-      const metadata = JSON.parse(metadataString);
+
+      // Check if metadata is a URL or JSON
+      let metadata;
+      if (metadataString.startsWith('ipfs://') || metadataString.startsWith('http')) {
+        // Metadata is a URL pointing to the actual metadata
+        metadata = { metadataUrl: metadataString };
+      } else {
+        try {
+          // Try to parse as JSON
+          metadata = JSON.parse(metadataString);
+        } catch {
+          // If parsing fails, treat as plain text
+          metadata = { raw: metadataString };
+        }
+      }
 
       return {
         tokenId,

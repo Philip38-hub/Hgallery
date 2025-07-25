@@ -7,12 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Upload, X, File, Image, Video, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { ContractExecuteTransaction, ContractFunctionParameters, AccountId, ContractId } from '@hashgraph/sdk';
+// Removed PrivateKey import - not safe for browser use
 import { useWallet } from '@/contexts/WalletContext';
 import { toast } from '@/hooks/use-toast';
 import { MediaMetadata, UploadProgress } from '@/types/hedera';
 import { ipfsService } from '@/services/ipfsService';
-import { hederaService } from '@/services/hederaService'; // Keep for Hedera types if needed, but minting will change
+import { hederaClientService } from '@/services/hederaClientService';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -25,7 +25,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose, 
   onUploadComplete 
 }) => {
-  const { wallet, isWalletConnected, signTransaction } = useWallet();
+  const { wallet, isWalletConnected } = useWallet();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<Partial<MediaMetadata>>({
     title: '',
@@ -156,51 +156,51 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       const metadataUpload = await ipfsService.uploadMetadata(nftMetadata);
       setUploadProgress(prev => prev ? { ...prev, progress: 75 } : null);
 
-      // Mint NFT on Hedera
+      // Prepare NFT metadata for minting
       setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
-      
-      // Get contract address from environment
-      const nftContractAddress = import.meta.env.VITE_NFT_CONTRACT_ID;
-      if (!nftContractAddress) {
-        throw new Error('NFT Contract ID not configured. Please set VITE_NFT_CONTRACT_ID in your .env file.');
-      }
 
-      // Mint NFT using Hedera SDK
-      setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 0 } : null);
+      // Get NFT collection configuration from environment
+      const nftCollectionId = import.meta.env.VITE_NFT_COLLECTION_ID;
+
+      if (!nftCollectionId) {
+        throw new Error('NFT Collection ID not configured. Please set VITE_NFT_COLLECTION_ID in your .env file.');
+      }
 
       if (!wallet?.accountId) {
         throw new Error('Wallet account ID not found.');
       }
 
-      const mintTx = new ContractExecuteTransaction()
-        .setContractId(ContractId.fromSolidityAddress(nftContractAddress).toString())
-        .setGas(2000000) // Increased gas limit
-        .setFunction("mint", new ContractFunctionParameters()
-          .addAddress(AccountId.fromString(wallet.accountId).toSolidityAddress())
-          .addString(metadataUpload.url)
-        );
+      // Check if token is associated with user account
+      setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 25 } : null);
 
-      const txId = await signTransaction(mintTx);
+      const isAssociated = await hederaClientService.isTokenAssociated(nftCollectionId, wallet.accountId);
 
-      if (!txId) {
-        throw new Error('Transaction signing failed.');
+      if (!isAssociated) {
+        throw new Error(`Token ${nftCollectionId} is not associated with your account. Please associate the token first.`);
       }
+
+      // For now, we'll just prepare the metadata and show success
+      // In a production app, you would send this to a backend service for minting
+      setUploadProgress(prev => prev ? { ...prev, status: 'minting', progress: 75 } : null);
+
+      console.log('NFT metadata prepared for minting:', {
+        collectionId: nftCollectionId,
+        metadataUrl: metadataUpload.url,
+        userAccount: wallet.accountId
+      });
 
       setUploadProgress(prev => prev ? { ...prev, progress: 100 } : null);
 
       // Complete
       setUploadProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
-      
+
       toast({
         title: "Upload Successful!",
-        description: `Your media has been minted as NFT! Transaction ID: ${txId.toString()}`,
+        description: `Your media has been uploaded to IPFS and metadata prepared for NFT minting!`,
       });
 
       setTimeout(() => {
-        // We don't get tokenId directly from the mint function,
-        // but we can infer it or fetch it from a mirror node later.
-        // For now, we'll just close the modal.
-        onUploadComplete?.(''); // Pass empty string or handle tokenId differently
+        onUploadComplete?.(nftCollectionId);
         handleClose();
       }, 2000);
 
