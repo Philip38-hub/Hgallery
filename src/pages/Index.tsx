@@ -4,7 +4,7 @@ import { SearchBar } from '@/components/search/SearchBar';
 import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { UploadModal } from '@/components/upload/UploadModal';
 import { MediaViewer } from '@/components/media/MediaViewer';
-import { VideoPlayerTest } from '@/components/test/VideoPlayerTest';
+// import { VideoPlayerTest } from '@/components/test/VideoPlayerTest';
 import { WalletProvider } from '@/contexts/WalletContext';
 import { MediaNFT, SearchFilters } from '@/types/hedera';
 import { hederaService } from '@/services/hederaService';
@@ -377,14 +377,14 @@ const Index = () => {
           <SearchBar onSearch={handleSearch} isLoading={isSearching} />
 
           {/* Video Player Test Component */}
-          <div className="mb-8">
+          {/* <div className="mb-8">
             <VideoPlayerTest
               realVideoNFT={filteredMedia.find(media =>
                 media.metadata.mediaType === 'video' ||
                 media.serialNumber === 13
               ) || null}
             />
-          </div>
+          </div> */}
 
           {/* Gallery */}
           <GalleryGrid
