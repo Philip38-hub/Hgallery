@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { HederaService } from '../src/services/hederaService';
 import { PrivateKey } from '@hashgraph/sdk';
+import { cacheService } from './cacheService';
 
 dotenv.config();
 
@@ -41,12 +42,92 @@ const treasuryAccountId = process.env.HEDERA_OPERATOR_ID!;
  * Health check endpoint
  */
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+  const cacheStats = cacheService.getStats();
+  res.json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     tokenId: tokenId,
-    treasuryAccount: treasuryAccountId
+    treasuryAccount: treasuryAccountId,
+    cache: {
+      totalKeys: cacheStats.keys,
+      hitRate: cacheStats.hits / (cacheStats.hits + cacheStats.misses) || 0,
+      memoryUsage: `${Math.round(cacheStats.vsize / 1024 / 1024 * 100) / 100} MB`
+    }
   });
+});
+
+/**
+ * Cache management endpoints
+ */
+app.get('/api/cache/stats', (req, res) => {
+  const stats = cacheService.getStats();
+  res.json({
+    success: true,
+    data: {
+      ...stats,
+      hitRate: stats.hits / (stats.hits + stats.misses) || 0,
+      memoryUsage: `${Math.round(stats.vsize / 1024 / 1024 * 100) / 100} MB`
+    }
+  });
+});
+
+app.post('/api/cache/clear', (req, res) => {
+  cacheService.invalidateAll();
+  res.json({
+    success: true,
+    message: 'All caches cleared'
+  });
+});
+
+app.post('/api/cache/preload', async (req, res) => {
+  try {
+    console.log('🔄 Starting cache preload...');
+
+    // Get token info to find total supply
+    const tokenInfo = await hederaService.getTokenInfo(tokenId);
+    const totalSupply = parseInt(tokenInfo.totalSupply);
+
+    if (totalSupply === 0) {
+      return res.json({
+        success: true,
+        message: 'No NFTs to preload'
+      });
+    }
+
+    // Helper functions for preloading
+    const fetchNFT = async (serial: number) => {
+      return await hederaService.getNFTInfo(tokenId, serial);
+    };
+
+    const fetchMetadata = async (hash: string) => {
+      const response = await fetch(`https://gateway.pinata.cloud/ipfs/${hash}`);
+      if (response.ok) {
+        return await response.json();
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    };
+
+    // Start preloading in background
+    cacheService.preloadCollection(tokenId, totalSupply, fetchNFT, fetchMetadata)
+      .then(() => {
+        console.log('✅ Cache preload completed');
+      })
+      .catch((error) => {
+        console.error('❌ Cache preload failed:', error);
+      });
+
+    res.json({
+      success: true,
+      message: `Started preloading ${totalSupply} NFTs in background`
+    });
+
+  } catch (error) {
+    console.error('Error starting cache preload:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to start cache preload'
+    });
+  }
 });
 
 /**
@@ -54,7 +135,15 @@ app.get('/api/health', (req, res) => {
  */
 app.get('/api/token-info', async (req, res) => {
   try {
-    const tokenInfo = await hederaService.getTokenInfo(tokenId);
+    // Check cache first
+    let tokenInfo = cacheService.getTokenInfo(tokenId);
+
+    if (!tokenInfo) {
+      // Fetch from Hedera if not cached
+      tokenInfo = await hederaService.getTokenInfo(tokenId);
+      cacheService.setTokenInfo(tokenId, tokenInfo);
+    }
+
     res.json({
       success: true,
       data: tokenInfo
@@ -126,6 +215,9 @@ app.post('/api/mint-nft', async (req, res) => {
         // The NFT is still minted and can be transferred later
       }
     }
+
+    // Invalidate collection cache since we have a new NFT
+    cacheService.invalidateCollection(tokenId);
 
     res.json({
       success: true,
@@ -215,27 +307,51 @@ app.get('/api/nft/:serialNumber', async (req, res) => {
       });
     }
 
-    const nftInfo = await hederaService.getNFTInfo(tokenId, serialNumber);
+    // Check cache first
+    let nftInfo = cacheService.getNFT(tokenId, serialNumber);
 
-    // If the NFT has an IPFS metadata URL, fetch the metadata content
-    if (nftInfo.metadata?.metadataUrl && nftInfo.metadata.metadataUrl.startsWith('ipfs://')) {
-      try {
+    if (!nftInfo) {
+      // Fetch from Hedera if not cached
+      nftInfo = await hederaService.getNFTInfo(tokenId, serialNumber);
+
+      // If the NFT has an IPFS metadata URL, fetch the metadata content
+      if (nftInfo.metadata?.metadataUrl && nftInfo.metadata.metadataUrl.startsWith('ipfs://')) {
         const hash = nftInfo.metadata.metadataUrl.replace('ipfs://', '');
         console.log(`🔍 Fetching metadata for NFT #${serialNumber} from IPFS: ${hash}`);
 
-        const response = await fetch(`https://gateway.pinata.cloud/ipfs/${hash}`);
-        if (response.ok) {
-          const metadataContent = await response.json();
-          console.log(`✅ Successfully fetched metadata for NFT #${serialNumber}`);
+        // Check metadata cache first
+        let metadataContent = cacheService.getMetadata(hash);
 
-          // Add the metadata content to the response
-          nftInfo.metadataContent = metadataContent;
-        } else {
-          console.warn(`⚠️ Failed to fetch metadata for NFT #${serialNumber}: ${response.statusText}`);
+        if (!metadataContent) {
+          try {
+            const response = await fetch(`https://gateway.pinata.cloud/ipfs/${hash}`);
+            if (response.ok) {
+              metadataContent = await response.json();
+              cacheService.setMetadata(hash, metadataContent);
+              console.log(`✅ Successfully fetched metadata for NFT #${serialNumber}`);
+            } else {
+              console.warn(`⚠️ Failed to fetch metadata for NFT #${serialNumber}: ${response.statusText}`);
+            }
+          } catch (metadataError) {
+            console.warn(`⚠️ Error fetching metadata for NFT #${serialNumber}:`, metadataError);
+          }
         }
-      } catch (metadataError) {
-        console.warn(`⚠️ Error fetching metadata for NFT #${serialNumber}:`, metadataError);
+
+        if (metadataContent) {
+          nftInfo.metadataContent = metadataContent;
+        }
       }
+
+      // Cache the complete NFT data
+      cacheService.setNFT({
+        tokenId: nftInfo.tokenId,
+        serialNumber: nftInfo.serialNumber,
+        accountId: nftInfo.accountId,
+        metadata: nftInfo.metadata,
+        metadataContent: nftInfo.metadataContent,
+        createdAt: nftInfo.createdAt,
+        cachedAt: Date.now()
+      });
     }
 
     res.json({
@@ -263,8 +379,22 @@ app.get('/api/collection/nfts', async (req, res) => {
 
     console.log(`📋 Fetching collection NFTs (limit: ${limit}, offset: ${offset})`);
 
-    // Get token info to find total supply
-    const tokenInfo = await hederaService.getTokenInfo(tokenId);
+    // Check cache first
+    let cachedResult = cacheService.getCollection(tokenId, limit, offset);
+    if (cachedResult) {
+      console.log(`📦 Returning cached collection data`);
+      return res.json({
+        success: true,
+        data: cachedResult
+      });
+    }
+
+    // Get token info to find total supply (with caching)
+    let tokenInfo = cacheService.getTokenInfo(tokenId);
+    if (!tokenInfo) {
+      tokenInfo = await hederaService.getTokenInfo(tokenId);
+      cacheService.setTokenInfo(tokenId, tokenInfo);
+    }
     const totalSupply = parseInt(tokenInfo.totalSupply);
 
     console.log(`📊 Total supply: ${totalSupply}`);
@@ -317,31 +447,57 @@ app.get('/api/collection/nfts', async (req, res) => {
     // Fetch NFTs in the specified range
     for (let serial = startSerial; serial <= endSerial; serial++) {
       try {
-        const nftInfo = await hederaService.getNFTInfo(tokenId, serial);
+        // Check cache first
+        let nftInfo = cacheService.getNFT(tokenId, serial);
 
-        // If the NFT has an IPFS metadata URL, fetch the metadata content
-        if (nftInfo.metadata?.metadataUrl && nftInfo.metadata.metadataUrl.startsWith('ipfs://')) {
-          const hash = nftInfo.metadata.metadataUrl.replace('ipfs://', '');
-          console.log(`🔍 Fetching metadata for NFT #${serial} from IPFS: ${hash}`);
+        if (!nftInfo) {
+          // Fetch from Hedera if not cached
+          nftInfo = await hederaService.getNFTInfo(tokenId, serial);
 
-          const metadataContent = await fetchMetadataWithRetry(hash);
-          if (metadataContent) {
-            console.log(`✅ Successfully fetched metadata for NFT #${serial}`);
-            nftInfo.metadataContent = metadataContent;
-          } else {
-            console.warn(`⚠️ Failed to fetch metadata for NFT #${serial} after retries`);
-            // Create a fallback metadata object
-            nftInfo.metadataContent = {
-              name: `NFT #${serial}`,
-              description: `Hedera NFT #${serial} from collection ${tokenId}`,
-              image: `ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG`, // Placeholder
-              type: "image/jpg",
-              creator: nftInfo.accountId
-            };
+          // If the NFT has an IPFS metadata URL, fetch the metadata content
+          if (nftInfo.metadata?.metadataUrl && nftInfo.metadata.metadataUrl.startsWith('ipfs://')) {
+            const hash = nftInfo.metadata.metadataUrl.replace('ipfs://', '');
+            console.log(`🔍 Fetching metadata for NFT #${serial} from IPFS: ${hash}`);
+
+            // Check metadata cache first
+            let metadataContent = cacheService.getMetadata(hash);
+
+            if (!metadataContent) {
+              metadataContent = await fetchMetadataWithRetry(hash);
+              if (metadataContent) {
+                cacheService.setMetadata(hash, metadataContent);
+              }
+            }
+
+            if (metadataContent) {
+              console.log(`✅ Successfully fetched metadata for NFT #${serial}`);
+              nftInfo.metadataContent = metadataContent;
+            } else {
+              console.warn(`⚠️ Failed to fetch metadata for NFT #${serial} after retries`);
+              // Create a fallback metadata object
+              nftInfo.metadataContent = {
+                name: `NFT #${serial}`,
+                description: `Hedera NFT #${serial} from collection ${tokenId}`,
+                image: `ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG`, // Placeholder
+                type: "image/jpg",
+                creator: nftInfo.accountId
+              };
+            }
+
+            // Add a small delay between requests to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
           }
 
-          // Add a small delay between requests to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // Cache the complete NFT data
+          cacheService.setNFT({
+            tokenId: nftInfo.tokenId,
+            serialNumber: nftInfo.serialNumber,
+            accountId: nftInfo.accountId,
+            metadata: nftInfo.metadata,
+            metadataContent: nftInfo.metadataContent,
+            createdAt: nftInfo.createdAt,
+            cachedAt: Date.now()
+          });
         }
 
         nfts.push(nftInfo);
@@ -356,15 +512,20 @@ app.get('/api/collection/nfts', async (req, res) => {
 
     console.log(`📦 Returning ${nfts.length} NFTs, hasMore: ${hasMore}`);
 
+    const result = {
+      nfts,
+      totalSupply,
+      hasMore,
+      offset,
+      limit
+    };
+
+    // Cache the result
+    cacheService.setCollection(tokenId, limit, offset, result);
+
     res.json({
       success: true,
-      data: {
-        nfts,
-        totalSupply,
-        hasMore,
-        offset,
-        limit
-      }
+      data: result
     });
 
   } catch (error) {

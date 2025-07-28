@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, X, File, Image, Video, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, X, File, Image, Video, Plus, Loader2, CheckCircle2, AlertCircle, Music } from 'lucide-react';
 // Removed PrivateKey import - not safe for browser use
 import { useWallet } from '@/contexts/WalletContext';
 import { toast } from '@/hooks/use-toast';
@@ -39,7 +39,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
 
   const maxFileSize = 50 * 1024 * 1024; // 50MB
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/mov'];
+  const allowedTypes = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm', 'video/mov',
+    'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/aac'
+  ];
 
   const resetForm = () => {
     setSelectedFile(null);
@@ -65,7 +69,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     if (!allowedTypes.includes(file.type)) {
       toast({
         title: "Invalid File Type",
-        description: "Please select an image (JPEG, PNG, GIF, WebP) or video (MP4, WebM, MOV) file.",
+        description: "Please select an image (JPEG, PNG, GIF, WebP), video (MP4, WebM, MOV), or audio (MP3, WAV, OGG, M4A, AAC) file.",
         variant: "destructive",
       });
       return;
@@ -85,7 +89,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       ...prev,
       originalFileName: file.name,
       fileSize: file.size,
-      mediaType: file.type.startsWith('image/') ? 'image' : 'video',
+      mediaType: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'audio',
     }));
   };
 
@@ -263,8 +267,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <div className="w-16 h-16 rounded-xl bg-gradient-accent mx-auto flex items-center justify-center">
                   {selectedFile.type.startsWith('image/') ? (
                     <Image className="w-8 h-8 text-accent-foreground" />
-                  ) : (
+                  ) : selectedFile.type.startsWith('video/') ? (
                     <Video className="w-8 h-8 text-accent-foreground" />
+                  ) : (
+                    <Music className="w-8 h-8 text-accent-foreground" />
                   )}
                 </div>
                 <div>

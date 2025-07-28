@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Eye, Calendar, Hash, Play, User } from 'lucide-react';
+import { Eye, Calendar, Hash, Play, User, Music } from 'lucide-react';
 import { MediaNFT } from '@/types/hedera';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -18,6 +18,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
 
   const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`;
   const isVideo = media.metadata.mediaType === 'video';
+  const isAudio = media.metadata.mediaType === 'audio';
 
   const formatFileSize = (bytes: number) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -52,6 +53,20 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
                     </div>
                   </div>
                 </div>
+              ) : isAudio ? (
+                <div className="relative w-full h-full bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3">
+                      <Music className="w-8 h-8 text-white" />
+                    </div>
+                    <p className="text-white text-sm font-medium truncate px-2">{media.metadata.title}</p>
+                  </div>
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <Play className="w-6 h-6 text-white ml-1" />
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <img
                   src={ipfsUrl}
@@ -63,15 +78,31 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
               )}
               
               {/* Media Type Badge */}
-              <Badge 
+              <Badge
                 className={`absolute top-2 right-2 ${
-                  isVideo 
-                    ? 'bg-accent/90 text-accent-foreground' 
+                  isVideo
+                    ? 'bg-accent/90 text-accent-foreground'
+                    : isAudio
+                    ? 'bg-purple-500/90 text-white'
                     : 'bg-primary/90 text-primary-foreground'
                 }`}
               >
-                {isVideo ? <Play className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
-                {isVideo ? 'Video' : 'Image'}
+                {isVideo ? (
+                  <>
+                    <Play className="w-3 h-3 mr-1" />
+                    Video
+                  </>
+                ) : isAudio ? (
+                  <>
+                    <Music className="w-3 h-3 mr-1" />
+                    Audio
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3 h-3 mr-1" />
+                    Image
+                  </>
+                )}
               </Badge>
               
               {/* View Overlay */}

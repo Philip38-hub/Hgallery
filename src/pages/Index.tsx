@@ -100,10 +100,12 @@ const convertNFTToMediaNFT = (nft: any): MediaNFT | null => {
     }
 
     // Determine media type from the image format or type field
-    let mediaType: 'image' | 'video' = 'image';
+    let mediaType: 'image' | 'video' | 'audio' = 'image';
     if (metadataContent.type) {
       if (metadataContent.type.startsWith('video/') || metadataContent.format === 'video') {
         mediaType = 'video';
+      } else if (metadataContent.type.startsWith('audio/') || metadataContent.format === 'audio') {
+        mediaType = 'audio';
       }
     }
 
@@ -233,13 +235,13 @@ const Index = () => {
       const totalSupply = parseInt(tokenInfoResponse.data.totalSupply);
       console.log(`📊 Total supply: ${totalSupply}`);
 
-      // Calculate offset to get the last 4 NFTs (most recently minted)
-      const limit = 4;
-      const offset = Math.max(0, totalSupply - limit);
+      // Fetch all NFTs from the collection for the landing page gallery
+      const limit = Math.min(totalSupply, 50); // Limit to 50 for performance, can be increased
+      const offset = 0; // Start from the beginning
 
-      console.log(`🎯 Fetching last ${limit} NFTs (offset: ${offset})`);
+      console.log(`🎯 Fetching ${limit} NFTs from collection (total supply: ${totalSupply})`);
 
-      // Fetch the last 4 NFTs from the collection
+      // Fetch NFTs from the collection
       const response = await backendService.getCollectionNFTs(limit, offset);
 
       if (!response.success || !response.data) {

@@ -19,7 +19,7 @@ export interface MediaMetadata {
   title: string;
   description: string;
   tags: string[];
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'audio';
   originalFileName: string;
   fileSize: number;
   uploadDate: string;
@@ -29,7 +29,7 @@ export interface MediaMetadata {
 export interface SearchFilters {
   query?: string;
   tags?: string[];
-  mediaType?: 'image' | 'video' | 'all';
+  mediaType?: 'image' | 'video' | 'audio' | 'all';
   dateRange?: {
     start: string;
     end: string;

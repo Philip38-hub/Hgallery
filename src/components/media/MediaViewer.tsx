@@ -4,15 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  X, 
-  Download, 
-  ExternalLink, 
-  Calendar, 
-  FileText, 
-  Hash, 
-  User, 
-  Shield, 
+import {
+  X,
+  Download,
+  ExternalLink,
+  Calendar,
+  FileText,
+  Hash,
+  User,
+  Shield,
   Coins,
   Copy,
   CheckCircle2
@@ -20,6 +20,7 @@ import {
 import { MediaNFT } from '@/types/hedera';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { EnhancedMediaPlayer } from './EnhancedMediaPlayer';
 
 interface MediaViewerProps {
   media: MediaNFT | null;
@@ -35,6 +36,8 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({ media, isOpen, onClose
 
   const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`;
   const isVideo = media.metadata.mediaType === 'video';
+  const isAudio = media.metadata.mediaType === 'audio';
+  const isInteractiveMedia = isVideo || isAudio;
 
   const formatFileSize = (bytes: number) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -83,12 +86,10 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({ media, isOpen, onClose
         <div className="flex h-full">
           {/* Media Display */}
           <div className="flex-1 bg-black/20 flex items-center justify-center relative">
-            {isVideo ? (
-              <video
-                src={ipfsUrl}
-                controls
-                className="max-w-full max-h-full object-contain"
-                onLoadedData={() => setImageLoaded(true)}
+            {isInteractiveMedia ? (
+              <EnhancedMediaPlayer
+                media={media}
+                className="w-full h-full"
               />
             ) : (
               <img
