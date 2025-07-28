@@ -1,17 +1,20 @@
 # Hedera Decentralized Gallery MVP
 
-A complete decentralized video and photo gallery built on the Hedera blockchain with React, featuring NFT minting, IPFS storage, and HashPack wallet integration.
+A complete decentralized video and photo gallery built on the Hedera blockchain with React, featuring NFT minting, IPFS storage, HashPack wallet integration, and advanced media playback capabilities.
 
 ## Features
 
 - **HashPack Wallet Integration**: Full HashConnect integration for secure wallet connection
 - **NFT Minting**: Upload content and mint as NFTs using Hedera Token Service (HTS)
 - **IPFS Storage**: Decentralized storage for media files and metadata via Pinata
+- **Advanced Media Player**: Enhanced video/audio player with custom controls, seeking, volume control, and fullscreen support
+- **Media Viewer**: Modal-based media viewer with player switching and download capabilities
 - **Search & Filter**: Advanced search with tags, dates, and content types
-- **Responsive Design**: Modern, mobile-friendly interface
+- **Responsive Design**: Modern, mobile-friendly interface with optimized media controls
 - **Blockchain Verification**: Content authenticity through blockchain verification
 - **Content Management**: Personal dashboard for managing your NFT collection
 - **Real-time Updates**: Live connection status and transaction feedback
+- **Multiple Player Fallbacks**: Robust media playback with enhanced and simple player options
 
 ## Tech Stack
 
@@ -100,15 +103,51 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
 ### For Viewers (No Wallet Required)
 - Browse the gallery to view all uploaded content
 - Use the search functionality to find specific content
-- View detailed information about each piece
+- Click on any media to open the enhanced viewer modal
+- **Video/Audio Playback**: Use the advanced media player with:
+  - Play/pause controls
+  - Seek bar for navigation
+  - Volume control with mute toggle
+  - Skip forward/backward buttons
+  - Fullscreen mode (videos)
+  - Download option
+- Switch between Enhanced and Simple players if needed
 
 ### For Creators (Wallet Required)
 1. Connect your HashPack wallet
 2. Click "Upload" or navigate to "My Content"
-3. Select a photo or video file
+3. Select a photo, video, or audio file
 4. Add title, description, and tags
 5. Upload to IPFS and mint as an NFT on Hedera
-6. Manage your collection in "My Content"
+6. View and manage your collection in "My Content"
+7. Test your media with the integrated player before and after minting
+
+## Media Player Features
+
+### Enhanced Media Player
+- **Custom Controls**: Professional-grade media controls with smooth animations
+- **Seek Bar**: Click or drag to navigate through content
+- **Volume Control**: Dedicated volume slider with mute toggle
+- **Skip Controls**: 10-second forward/backward skip buttons
+- **Fullscreen Support**: Native fullscreen mode for video content
+- **Auto-hide Controls**: Controls fade out during playback for immersive viewing
+- **Download Integration**: Direct download from IPFS with original filename
+- **Error Handling**: Automatic fallback to simple player on errors
+- **Multiple Formats**: Support for various video and audio formats
+- **IPFS Optimization**: Multiple gateway fallbacks for reliable content delivery
+
+### Simple Media Player
+- **Native HTML5 Controls**: Browser-native controls for maximum compatibility
+- **Fallback Option**: Automatic activation when enhanced player fails
+- **Cross-browser Support**: Works across all modern browsers
+- **Accessibility**: Full keyboard and screen reader support
+
+### Media Viewer Modal
+- **Responsive Design**: Optimized for all screen sizes
+- **Player Switching**: Toggle between Enhanced and Simple players
+- **Metadata Display**: Rich information panel with NFT details
+- **Social Features**: Copy links, view on IPFS, download options
+- **Keyboard Navigation**: Full keyboard support for accessibility
 
 ## Architecture
 
@@ -118,7 +157,9 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
 - `GalleryView`: Main gallery display with stats
 - `SearchView`: Search interface and results
 - `UploadForm`: Content upload and NFT minting
-- `ContentViewer`: Modal for viewing content details
+- `MediaViewer`: Advanced modal for viewing content with media player integration
+- `EnhancedMediaPlayer`: Full-featured video/audio player with custom controls
+- `SimpleMediaPlayer`: Fallback player using native HTML5 controls
 - `MyContent`: Personal content management dashboard
 
 ### Services
@@ -180,6 +221,18 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
 - Personal content dashboard
 - Search and filtering
 - Responsive design
+- **Advanced Media Player**: Full-featured video/audio player with:
+  - Custom playback controls (play/pause, seek, volume)
+  - Skip forward/backward (10 seconds)
+  - Fullscreen support for videos
+  - Download functionality
+  - Auto-hiding controls during playback
+  - Multiple IPFS gateway fallbacks
+- **Media Viewer Modal**: Enhanced viewing experience with:
+  - Player switching (Enhanced ↔ Simple)
+  - Optimized controls layout
+  - Proper overflow handling
+  - Responsive design for all screen sizes
 
 🔄 **Demo Limitations:**
 - Uses mock data for gallery display
