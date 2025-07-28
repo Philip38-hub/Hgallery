@@ -8,6 +8,7 @@ import { WalletProvider } from '@/contexts/WalletContext';
 import { MediaNFT, SearchFilters } from '@/types/hedera';
 import { hederaService } from '@/services/hederaService';
 import { ipfsService } from '@/services/ipfsService';
+import { backendService } from '@/services/backendService';
 import { toast } from '@/hooks/use-toast';
 
 // Mock data for demonstration
@@ -68,11 +69,89 @@ const mockMediaData: MediaNFT[] = [
   }
 ];
 
+// Utility function to convert backend NFT data to MediaNFT format
+const convertNFTToMediaNFT = (nft: any): MediaNFT | null => {
+  try {
+    console.log(`🔄 Converting NFT #${nft.serialNumber}:`, nft);
+
+    // Check if we have metadata content from the backend
+    const metadataContent = nft.metadataContent;
+    if (!metadataContent) {
+      console.warn(`NFT #${nft.serialNumber} has no metadata content`);
+      return null;
+    }
+
+    // Extract image hash from metadata - handle both ipfs:// and gateway URLs
+    let ipfsHash = '';
+    if (metadataContent.image) {
+      if (metadataContent.image.startsWith('ipfs://')) {
+        ipfsHash = metadataContent.image.replace('ipfs://', '');
+      } else if (metadataContent.image.includes('/ipfs/')) {
+        // Handle gateway URLs like https://gateway.pinata.cloud/ipfs/hash
+        const ipfsIndex = metadataContent.image.indexOf('/ipfs/');
+        ipfsHash = metadataContent.image.substring(ipfsIndex + 6); // +6 for '/ipfs/'
+      } else {
+        console.warn(`NFT #${nft.serialNumber} has unsupported image URL format:`, metadataContent.image);
+        return null;
+      }
+    } else {
+      console.warn(`NFT #${nft.serialNumber} has no image URL in metadata`);
+      return null;
+    }
+
+    // Determine media type from the image format or type field
+    let mediaType: 'image' | 'video' = 'image';
+    if (metadataContent.type) {
+      if (metadataContent.type.startsWith('video/') || metadataContent.format === 'video') {
+        mediaType = 'video';
+      }
+    }
+
+    // Extract tags from various possible locations
+    let tags: string[] = [];
+    if (metadataContent.properties?.tags) {
+      tags = metadataContent.properties.tags;
+    } else if (metadataContent.attributes) {
+      // Extract tags from attributes if they exist
+      tags = metadataContent.attributes
+        .filter((attr: any) => attr.trait_type === 'tag' || attr.trait_type === 'tags')
+        .map((attr: any) => attr.value);
+    }
+
+    // Convert to MediaNFT format
+    const mediaNFT: MediaNFT = {
+      tokenId: nft.tokenId,
+      serialNumber: nft.serialNumber,
+      accountId: nft.accountId,
+      ipfsHash: ipfsHash,
+      transactionId: `${nft.tokenId}@${Date.now()}`, // Placeholder transaction ID
+      createdAt: nft.createdAt,
+      metadata: {
+        title: metadataContent.name || `NFT #${nft.serialNumber}`,
+        description: metadataContent.description || '',
+        tags: tags,
+        mediaType: mediaType,
+        originalFileName: metadataContent.properties?.originalFileName || `nft-${nft.serialNumber}`,
+        fileSize: metadataContent.properties?.fileSize || 0,
+        uploadDate: metadataContent.properties?.uploadDate || nft.createdAt,
+        creator: metadataContent.creator || metadataContent.properties?.creator || nft.accountId
+      }
+    };
+
+    console.log(`✅ Successfully converted NFT #${nft.serialNumber} to MediaNFT:`, mediaNFT);
+    return mediaNFT;
+  } catch (error) {
+    console.error(`Error converting NFT #${nft.serialNumber}:`, error);
+    return null;
+  }
+};
+
 const Index = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaNFT | null>(null);
-  const [filteredMedia, setFilteredMedia] = useState<MediaNFT[]>(mockMediaData);
+  const [filteredMedia, setFilteredMedia] = useState<MediaNFT[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleSearch = async (filters: SearchFilters) => {
     setIsSearching(true);
@@ -139,17 +218,67 @@ const Index = () => {
   };
 
   const loadGalleryData = async () => {
+    setIsLoading(true);
     try {
-      // In a real implementation, you would fetch NFTs from Hedera Mirror Node
-      // For now, we'll use the mock data
-      setFilteredMedia(mockMediaData);
+      console.log('🔄 Loading gallery data from blockchain...');
+
+      // First, get token info to find total supply
+      const tokenInfoResponse = await backendService.getTokenInfo();
+      if (!tokenInfoResponse.success || !tokenInfoResponse.data) {
+        console.warn('Failed to get token info, falling back to mock data');
+        setFilteredMedia(mockMediaData);
+        return;
+      }
+
+      const totalSupply = parseInt(tokenInfoResponse.data.totalSupply);
+      console.log(`📊 Total supply: ${totalSupply}`);
+
+      // Calculate offset to get the last 4 NFTs (most recently minted)
+      const limit = 4;
+      const offset = Math.max(0, totalSupply - limit);
+
+      console.log(`🎯 Fetching last ${limit} NFTs (offset: ${offset})`);
+
+      // Fetch the last 4 NFTs from the collection
+      const response = await backendService.getCollectionNFTs(limit, offset);
+
+      if (!response.success || !response.data) {
+        console.warn('Failed to fetch collection NFTs, falling back to mock data');
+        setFilteredMedia(mockMediaData);
+        return;
+      }
+
+      console.log(`📦 Fetched ${response.data.nfts.length} NFTs from collection (serials ${offset + 1}-${offset + response.data.nfts.length})`);
+
+      // Convert NFT data to MediaNFT format
+      console.log(`🔄 Converting ${response.data.nfts.length} NFTs to MediaNFT format...`);
+      const mediaResults = response.data.nfts.map(nft => convertNFTToMediaNFT(nft));
+
+      // Filter out null results (failed conversions)
+      const validMedia = mediaResults.filter((media): media is MediaNFT => media !== null);
+
+      console.log(`✅ Successfully converted ${validMedia.length} NFTs to media format`);
+      console.log('Valid media:', validMedia);
+
+      if (validMedia.length === 0) {
+        console.log('No valid NFTs found, using mock data for demonstration');
+        setFilteredMedia(mockMediaData);
+      } else {
+        console.log(`🎉 Setting ${validMedia.length} real NFTs to display!`);
+        setFilteredMedia(validMedia);
+      }
+
     } catch (error) {
       console.error('Error loading gallery data:', error);
       toast({
         title: "Error Loading Gallery",
-        description: "Failed to load gallery data. Please try again.",
+        description: "Failed to load gallery data. Showing demo content.",
         variant: "destructive",
       });
+      // Fallback to mock data on error
+      setFilteredMedia(mockMediaData);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -188,7 +317,7 @@ const Index = () => {
           {/* Gallery */}
           <GalleryGrid
             media={filteredMedia}
-            isLoading={isSearching}
+            isLoading={isLoading || isSearching}
             onMediaClick={setSelectedMedia}
             onRefresh={handleRefresh}
           />

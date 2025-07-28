@@ -88,6 +88,10 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
 
 6. Start the development server:
    ```bash
+   npm run server
+   ```
+7. Start the frontend in another terminal:
+   ```bash
    npm run dev
    ```
 

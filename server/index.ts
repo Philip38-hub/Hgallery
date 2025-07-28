@@ -201,13 +201,13 @@ app.post('/api/transfer-nft', async (req, res) => {
 });
 
 /**
- * Get NFT information
+ * Get NFT information with metadata
  * GET /api/nft/:serialNumber
  */
 app.get('/api/nft/:serialNumber', async (req, res) => {
   try {
     const serialNumber = parseInt(req.params.serialNumber);
-    
+
     if (isNaN(serialNumber)) {
       return res.status(400).json({
         success: false,
@@ -216,7 +216,28 @@ app.get('/api/nft/:serialNumber', async (req, res) => {
     }
 
     const nftInfo = await hederaService.getNFTInfo(tokenId, serialNumber);
-    
+
+    // If the NFT has an IPFS metadata URL, fetch the metadata content
+    if (nftInfo.metadata?.metadataUrl && nftInfo.metadata.metadataUrl.startsWith('ipfs://')) {
+      try {
+        const hash = nftInfo.metadata.metadataUrl.replace('ipfs://', '');
+        console.log(`🔍 Fetching metadata for NFT #${serialNumber} from IPFS: ${hash}`);
+
+        const response = await fetch(`https://gateway.pinata.cloud/ipfs/${hash}`);
+        if (response.ok) {
+          const metadataContent = await response.json();
+          console.log(`✅ Successfully fetched metadata for NFT #${serialNumber}`);
+
+          // Add the metadata content to the response
+          nftInfo.metadataContent = metadataContent;
+        } else {
+          console.warn(`⚠️ Failed to fetch metadata for NFT #${serialNumber}: ${response.statusText}`);
+        }
+      } catch (metadataError) {
+        console.warn(`⚠️ Error fetching metadata for NFT #${serialNumber}:`, metadataError);
+      }
+    }
+
     res.json({
       success: true,
       data: nftInfo
@@ -232,6 +253,168 @@ app.get('/api/nft/:serialNumber', async (req, res) => {
 });
 
 /**
+ * Get all NFTs from the collection
+ * GET /api/collection/nfts
+ */
+app.get('/api/collection/nfts', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    console.log(`📋 Fetching collection NFTs (limit: ${limit}, offset: ${offset})`);
+
+    // Get token info to find total supply
+    const tokenInfo = await hederaService.getTokenInfo(tokenId);
+    const totalSupply = parseInt(tokenInfo.totalSupply);
+
+    console.log(`📊 Total supply: ${totalSupply}`);
+
+    if (totalSupply === 0) {
+      return res.json({
+        success: true,
+        data: {
+          nfts: [],
+          totalSupply: 0,
+          hasMore: false
+        }
+      });
+    }
+
+    const nfts = [];
+    const startSerial = offset + 1;
+    const endSerial = Math.min(startSerial + limit - 1, totalSupply);
+
+    console.log(`🔍 Checking NFTs from serial ${startSerial} to ${endSerial}`);
+
+    // Helper function to fetch metadata with retry logic
+    const fetchMetadataWithRetry = async (hash: string, retries = 3, delay = 1000): Promise<any | null> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const response = await fetch(`https://gateway.pinata.cloud/ipfs/${hash}`);
+          if (response.ok) {
+            return await response.json();
+          } else if (response.status === 429) {
+            // Rate limited, wait longer before retry
+            console.warn(`⚠️ Rate limited on attempt ${attempt}/${retries}, waiting ${delay * attempt}ms...`);
+            if (attempt < retries) {
+              await new Promise(resolve => setTimeout(resolve, delay * attempt));
+              continue;
+            }
+          } else {
+            console.warn(`⚠️ HTTP ${response.status}: ${response.statusText}`);
+            return null;
+          }
+        } catch (error) {
+          console.warn(`⚠️ Attempt ${attempt}/${retries} failed:`, error);
+          if (attempt < retries) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      return null;
+    };
+
+    // Fetch NFTs in the specified range
+    for (let serial = startSerial; serial <= endSerial; serial++) {
+      try {
+        const nftInfo = await hederaService.getNFTInfo(tokenId, serial);
+
+        // If the NFT has an IPFS metadata URL, fetch the metadata content
+        if (nftInfo.metadata?.metadataUrl && nftInfo.metadata.metadataUrl.startsWith('ipfs://')) {
+          const hash = nftInfo.metadata.metadataUrl.replace('ipfs://', '');
+          console.log(`🔍 Fetching metadata for NFT #${serial} from IPFS: ${hash}`);
+
+          const metadataContent = await fetchMetadataWithRetry(hash);
+          if (metadataContent) {
+            console.log(`✅ Successfully fetched metadata for NFT #${serial}`);
+            nftInfo.metadataContent = metadataContent;
+          } else {
+            console.warn(`⚠️ Failed to fetch metadata for NFT #${serial} after retries`);
+            // Create a fallback metadata object
+            nftInfo.metadataContent = {
+              name: `NFT #${serial}`,
+              description: `Hedera NFT #${serial} from collection ${tokenId}`,
+              image: `ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG`, // Placeholder
+              type: "image/jpg",
+              creator: nftInfo.accountId
+            };
+          }
+
+          // Add a small delay between requests to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        nfts.push(nftInfo);
+        console.log(`✅ Found NFT #${serial} owned by ${nftInfo.accountId}`);
+      } catch (error) {
+        console.debug(`⚠️ NFT #${serial} not found or not accessible:`, error);
+        // Continue to next serial number
+      }
+    }
+
+    const hasMore = endSerial < totalSupply;
+
+    console.log(`📦 Returning ${nfts.length} NFTs, hasMore: ${hasMore}`);
+
+    res.json({
+      success: true,
+      data: {
+        nfts,
+        totalSupply,
+        hasMore,
+        offset,
+        limit
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting collection NFTs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get collection NFTs'
+    });
+  }
+});
+
+/**
+ * Test IPFS metadata fetching
+ * GET /api/test-ipfs?hash=<hash>
+ */
+app.get('/api/test-ipfs', async (req, res) => {
+  try {
+    const hash = req.query.hash as string;
+    if (!hash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Hash parameter is required'
+      });
+    }
+
+    console.log(`🧪 Testing IPFS fetch for hash: ${hash}`);
+
+    const response = await fetch(`https://gateway.pinata.cloud/ipfs/${hash}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Successfully fetched IPFS data:`, data);
+
+    res.json({
+      success: true,
+      data: data
+    });
+
+  } catch (error) {
+    console.error('Error testing IPFS fetch:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch from IPFS'
+    });
+  }
+});
+
+/**
  * Get account balance
  * GET /api/balance/:accountId
  */
@@ -239,7 +422,7 @@ app.get('/api/balance/:accountId', async (req, res) => {
   try {
     const accountId = req.params.accountId;
     const balance = await hederaService.getAccountBalance(accountId);
-    
+
     res.json({
       success: true,
       data: balance

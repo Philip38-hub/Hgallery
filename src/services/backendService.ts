@@ -87,6 +87,24 @@ export interface AccountBalanceResponse {
   error?: string;
 }
 
+export interface CollectionNFTsResponse {
+  success: boolean;
+  data?: {
+    nfts: Array<{
+      tokenId: string;
+      serialNumber: number;
+      accountId: string;
+      metadata: any;
+      createdAt: string;
+    }>;
+    totalSupply: number;
+    hasMore: boolean;
+    offset: number;
+    limit: number;
+  };
+  error?: string;
+}
+
 export class BackendService {
   private baseURL: string;
 
@@ -162,6 +180,21 @@ export class BackendService {
       return response.data;
     } catch (error) {
       console.error('Error getting account balance:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      throw error;
+    }
+  }
+
+  async getCollectionNFTs(limit: number = 100, offset: number = 0): Promise<CollectionNFTsResponse> {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/collection/nfts`, {
+        params: { limit, offset }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting collection NFTs:', error);
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }

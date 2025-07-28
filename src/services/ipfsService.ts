@@ -82,8 +82,11 @@ export class IPFSService {
 
   async getJSON(hash: string): Promise<any> {
     try {
+      console.log(`🔍 Fetching JSON from IPFS hash: ${hash}`);
       const response = await this.getFile(hash);
-      return await response.json();
+      const jsonData = await response.json();
+      console.log(`✅ Successfully fetched JSON from IPFS:`, jsonData);
+      return jsonData;
     } catch (error) {
       console.error('Error fetching JSON from IPFS:', error);
       throw error;
