@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -21,6 +22,7 @@ import { MediaNFT } from '@/types/hedera';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { EnhancedMediaPlayer } from './EnhancedMediaPlayer';
+import { SimpleMediaPlayer } from './SimpleMediaPlayer';
 
 interface MediaViewerProps {
   media: MediaNFT | null;
@@ -31,6 +33,7 @@ interface MediaViewerProps {
 export const MediaViewer: React.FC<MediaViewerProps> = ({ media, isOpen, onClose }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [copiedFields, setCopiedFields] = useState<Record<string, boolean>>({});
+  const [useSimplePlayer, setUseSimplePlayer] = useState(false);
 
   if (!media) return null;
 
@@ -83,14 +86,26 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({ media, isOpen, onClose
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[95vh] p-0 overflow-hidden bg-card border-border">
-        <div className="flex h-full">
+        <VisuallyHidden>
+          <DialogTitle>{media.metadata.title}</DialogTitle>
+          <DialogDescription>{media.metadata.description}</DialogDescription>
+        </VisuallyHidden>
+        <div className="flex h-full min-h-[60vh]">
           {/* Media Display */}
-          <div className="flex-1 bg-black/20 flex items-center justify-center relative">
+          <div className="flex-1 bg-black/20 flex items-center justify-center relative min-h-0">
             {isInteractiveMedia ? (
-              <EnhancedMediaPlayer
-                media={media}
-                className="w-full h-full"
-              />
+              useSimplePlayer ? (
+                <SimpleMediaPlayer
+                  media={media}
+                  className="w-full h-full max-h-full"
+                />
+              ) : (
+                <EnhancedMediaPlayer
+                  media={media}
+                  className="w-full h-full max-h-full"
+                  onError={() => setUseSimplePlayer(true)}
+                />
+              )
             ) : (
               <img
                 src={ipfsUrl}
@@ -98,6 +113,18 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({ media, isOpen, onClose
                 className="max-w-full max-h-full object-contain"
                 onLoad={() => setImageLoaded(true)}
               />
+            )}
+
+            {/* Player Toggle Button for Video/Audio */}
+            {isInteractiveMedia && (
+              <Button
+                onClick={() => setUseSimplePlayer(!useSimplePlayer)}
+                variant="secondary"
+                size="sm"
+                className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm text-white border-white/30 hover:bg-black/70"
+              >
+                {useSimplePlayer ? 'Enhanced Player' : 'Simple Player'}
+              </Button>
             )}
             
             {/* Close Button */}

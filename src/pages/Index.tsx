@@ -4,6 +4,7 @@ import { SearchBar } from '@/components/search/SearchBar';
 import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { UploadModal } from '@/components/upload/UploadModal';
 import { MediaViewer } from '@/components/media/MediaViewer';
+import { VideoPlayerTest } from '@/components/test/VideoPlayerTest';
 import { WalletProvider } from '@/contexts/WalletContext';
 import { MediaNFT, SearchFilters } from '@/types/hedera';
 import { hederaService } from '@/services/hederaService';
@@ -101,13 +102,51 @@ const convertNFTToMediaNFT = (nft: any): MediaNFT | null => {
 
     // Determine media type from the image format or type field
     let mediaType: 'image' | 'video' | 'audio' = 'image';
-    if (metadataContent.type) {
-      if (metadataContent.type.startsWith('video/') || metadataContent.format === 'video') {
-        mediaType = 'video';
-      } else if (metadataContent.type.startsWith('audio/') || metadataContent.format === 'audio') {
-        mediaType = 'audio';
+
+    // Check multiple possible sources for media type
+    const typeIndicators = [
+      metadataContent.type,
+      metadataContent.format,
+      metadataContent.mediaType,
+      metadataContent.properties?.mediaType,
+      metadataContent.properties?.type
+    ].filter(Boolean);
+
+    console.log(`🔍 NFT #${nft.serialNumber} type indicators:`, typeIndicators);
+
+    for (const indicator of typeIndicators) {
+      if (typeof indicator === 'string') {
+        if (indicator.toLowerCase().includes('video') || indicator.startsWith('video/')) {
+          mediaType = 'video';
+          break;
+        } else if (indicator.toLowerCase().includes('audio') || indicator.startsWith('audio/')) {
+          mediaType = 'audio';
+          break;
+        }
       }
     }
+
+    // Also check file extension from image URL or filename
+    const imageUrl = metadataContent.image || '';
+    const fileName = metadataContent.properties?.originalFileName || '';
+    const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+    const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac'];
+
+    if (mediaType === 'image') { // Only check extensions if type not already determined
+      const urlsToCheck = [imageUrl, fileName].filter(Boolean);
+      for (const url of urlsToCheck) {
+        const lowerUrl = url.toLowerCase();
+        if (videoExtensions.some(ext => lowerUrl.includes(ext))) {
+          mediaType = 'video';
+          break;
+        } else if (audioExtensions.some(ext => lowerUrl.includes(ext))) {
+          mediaType = 'audio';
+          break;
+        }
+      }
+    }
+
+    console.log(`📹 NFT #${nft.serialNumber} detected media type: ${mediaType}`);
 
     // Extract tags from various possible locations
     let tags: string[] = [];
@@ -262,6 +301,27 @@ const Index = () => {
       console.log(`✅ Successfully converted ${validMedia.length} NFTs to media format`);
       console.log('Valid media:', validMedia);
 
+      // Log video NFTs specifically
+      const videoNFTs = validMedia.filter(media => media.metadata.mediaType === 'video');
+      if (videoNFTs.length > 0) {
+        console.log('🎬 Found video NFTs:', videoNFTs);
+        videoNFTs.forEach(video => {
+          console.log(`📹 Video NFT #${video.serialNumber}:`, {
+            title: video.metadata.title,
+            mediaType: video.metadata.mediaType,
+            ipfsHash: video.ipfsHash,
+            ipfsUrl: `https://gateway.pinata.cloud/ipfs/${video.ipfsHash}`
+          });
+        });
+      } else {
+        console.log('⚠️ No video NFTs found in collection');
+        console.log('🔍 Checking media types:', validMedia.map(m => ({
+          serial: m.serialNumber,
+          type: m.metadata.mediaType,
+          ipfsHash: m.ipfsHash
+        })));
+      }
+
       if (validMedia.length === 0) {
         console.log('No valid NFTs found, using mock data for demonstration');
         setFilteredMedia(mockMediaData);
@@ -315,6 +375,16 @@ const Index = () => {
 
           {/* Search */}
           <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+
+          {/* Video Player Test Component */}
+          <div className="mb-8">
+            <VideoPlayerTest
+              realVideoNFT={filteredMedia.find(media =>
+                media.metadata.mediaType === 'video' ||
+                media.serialNumber === 13
+              ) || null}
+            />
+          </div>
 
           {/* Gallery */}
           <GalleryGrid
