@@ -18,6 +18,7 @@ export class HashConnectService {
   private state: HashPackConnectionState;
   private listeners: ((state: HashPackConnectionState) => void)[] = [];
   private pairingData: SessionData | null = null;
+  private isInitialized: boolean = false;
   private appMetadata = {
     name: import.meta.env.VITE_HASHCONNECT_APP_NAME || 'Hedera Gallery',
     description: import.meta.env.VITE_HASHCONNECT_APP_DESCRIPTION || 'Decentralized Media NFT Gallery',
@@ -91,6 +92,12 @@ export class HashConnectService {
 
   async initializeConnection(): Promise<void> {
     try {
+      // Prevent multiple initializations
+      if (this.isInitialized) {
+        console.log('HashConnect already initialized, skipping...');
+        return;
+      }
+
       console.log('Initializing HashConnect...');
 
       // Setup event listeners before initialization
@@ -99,10 +106,89 @@ export class HashConnectService {
       // Initialize HashConnect (v3 takes no parameters)
       await this.hashconnect.init();
 
+      this.isInitialized = true;
       console.log('HashConnect initialized successfully');
+
+      // Check for existing sessions after initialization
+      await this.checkForExistingSessions();
     } catch (error) {
       console.error('Failed to initialize HashConnect:', error);
       throw error;
+    }
+  }
+
+  private async checkForExistingSessions(): Promise<void> {
+    try {
+      console.log('Checking for existing sessions...');
+
+      // In HashConnect v3, check if there are any existing sessions
+      // Try multiple approaches to get session data
+
+      // Approach 1: Check for getSessions method
+      if (this.hashconnect && (this.hashconnect as any).getSessions) {
+        const sessions = (this.hashconnect as any).getSessions();
+        console.log('Found sessions via getSessions():', sessions);
+
+        if (sessions && sessions.length > 0) {
+          const session = sessions[0]; // Use the first available session
+          console.log('Restoring session:', session);
+
+          // Update state with session information
+          if (session.accountIds && session.accountIds.length > 0) {
+            this.state.accountId = session.accountIds[0];
+            this.state.isConnected = true;
+            this.state.network = session.network || 'testnet';
+            this.pairingData = session;
+
+            console.log('Session restored successfully:', {
+              accountId: this.state.accountId,
+              network: this.state.network,
+              isConnected: this.state.isConnected
+            });
+
+            // Notify listeners about the restored connection
+            this.notifyListeners();
+            return;
+          }
+        }
+      }
+
+      // Approach 2: Check for session data in other properties
+      if (this.hashconnect && (this.hashconnect as any).sessionData) {
+        const sessionData = (this.hashconnect as any).sessionData;
+        console.log('Found session data:', sessionData);
+
+        if (sessionData && sessionData.accountIds && sessionData.accountIds.length > 0) {
+          this.state.accountId = sessionData.accountIds[0];
+          this.state.isConnected = true;
+          this.state.network = sessionData.network || 'testnet';
+          this.pairingData = sessionData;
+
+          console.log('Session restored from sessionData:', {
+            accountId: this.state.accountId,
+            network: this.state.network,
+            isConnected: this.state.isConnected
+          });
+
+          this.notifyListeners();
+          return;
+        }
+      }
+
+      // Approach 3: Wait for automatic session restoration
+      console.log('No immediate session data found, waiting for automatic restoration...');
+
+      // Give HashConnect time to automatically restore sessions and fire events
+      setTimeout(() => {
+        console.log('Timeout check - current state:', this.getState());
+        if (!this.state.isConnected) {
+          console.log('No session was automatically restored');
+        }
+      }, 2000);
+
+    } catch (error) {
+      console.warn('Error checking for existing sessions:', error);
+      // Don't throw here as this is not critical for initialization
     }
   }
 

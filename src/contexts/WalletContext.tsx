@@ -97,6 +97,22 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   };
   // Check for existing connection on mount
   useEffect(() => {
+    // Check localStorage for existing wallet data first
+    const checkStoredWallet = () => {
+      try {
+        const storedWallet = localStorage.getItem('hedera_wallet');
+        if (storedWallet) {
+          const walletData = JSON.parse(storedWallet);
+          console.log('Found stored wallet data:', walletData);
+          // Set the wallet state immediately for better UX
+          setWallet(walletData);
+        }
+      } catch (error) {
+        console.warn('Error reading stored wallet data:', error);
+        localStorage.removeItem('hedera_wallet');
+      }
+    };
+
     // Initialize HashConnect
     const initializeHashConnect = async () => {
       try {
@@ -111,6 +127,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
     };
 
+    // Check stored wallet first for immediate feedback
+    checkStoredWallet();
+
+    // Then initialize HashConnect
     initializeHashConnect();
 
     // Cleanup function

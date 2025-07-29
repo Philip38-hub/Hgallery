@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Loader2
 } from 'lucide-react';
-import { WalletProvider } from '@/contexts/WalletContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { TokenAssociation } from '@/components/wallet/TokenAssociation';
 import { UploadModal } from '@/components/upload/UploadModal';
@@ -272,9 +271,5 @@ const MintNFTContent: React.FC = () => {
 };
 
 export const MintNFT: React.FC = () => {
-  return (
-    <WalletProvider>
-      <MintNFTContent />
-    </WalletProvider>
-  );
+  return <MintNFTContent />;
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Wallet, Upload, LogOut, Zap, User, QrCode } from 'lucide-react';
+import { Wallet, LogOut, Zap, User, QrCode } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useWallet } from '@/contexts/WalletContext';
 import { useState } from 'react';
@@ -27,7 +27,6 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
             </div> */}
             <div className="mt-3">
               <img src="/logo.png" alt="Harchive Logo" className="h-40 w-auto"/>
-              <p className="text-xs text-muted-foreground">Decentralized Media NFTs</p>
             </div>
           </Link>
         </div>
@@ -61,17 +60,6 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
             <div className="w-2 h-2 rounded-full bg-accent mr-2 animate-glow" />
             Testnet
           </Badge>
-
-          {/* Upload Button - Only for connected wallets and when onUploadClick is provided */}
-          {isWalletConnected && onUploadClick && (
-            <Button
-              onClick={onUploadClick}
-              className="bg-gradient-accent text-accent-foreground shadow-accent hover:shadow-accent/70 transition-all duration-300"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload
-            </Button>
-          )}
 
           {/* Wallet Connection */}
           {isWalletConnected ? (

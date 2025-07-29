@@ -5,7 +5,6 @@ import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { UploadModal } from '@/components/upload/UploadModal';
 import { MediaViewer } from '@/components/media/MediaViewer';
 // import { VideoPlayerTest } from '@/components/test/VideoPlayerTest';
-import { WalletProvider } from '@/contexts/WalletContext';
 import { MediaNFT, SearchFilters } from '@/types/hedera';
 import { hederaService } from '@/services/hederaService';
 import { ipfsService } from '@/services/ipfsService';
@@ -357,58 +356,56 @@ const Index = () => {
     loadGalleryData();
   }, []);
   return (
-    <WalletProvider>
-      <div className="min-h-screen bg-gradient-background">
-        <Header onUploadClick={() => setIsUploadModalOpen(true)} />
-        
-        <main className="container mx-auto px-4 py-8 space-y-8">
-          {/* Hero Section */}
-          <div className="text-center space-y-4 py-12">
-            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Hedera Gallery
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Discover, upload, and trade media NFTs on the Hedera blockchain.<br/>
-              <strong>Record History a fresh.</strong>
-            </p>
-          </div>
+    <div className="min-h-screen bg-gradient-background">
+      <Header onUploadClick={() => setIsUploadModalOpen(true)} />
 
-          {/* Search */}
-          <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Hero Section */}
+        <div className="text-center space-y-4 py-12">
+          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            Hedera Gallery
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Discover, upload, and trade media NFTs on the Hedera blockchain.<br/>
+            <strong>Record History a fresh.</strong>
+          </p>
+        </div>
 
-          {/* Video Player Test Component */}
-          {/* <div className="mb-8">
-            <VideoPlayerTest
-              realVideoNFT={filteredMedia.find(media =>
-                media.metadata.mediaType === 'video' ||
-                media.serialNumber === 13
-              ) || null}
-            />
-          </div> */}
+        {/* Search */}
+        <SearchBar onSearch={handleSearch} isLoading={isSearching} />
 
-          {/* Gallery */}
-          <GalleryGrid
-            media={filteredMedia}
-            isLoading={isLoading || isSearching}
-            onMediaClick={setSelectedMedia}
-            onRefresh={handleRefresh}
+        {/* Video Player Test Component */}
+        {/* <div className="mb-8">
+          <VideoPlayerTest
+            realVideoNFT={filteredMedia.find(media =>
+              media.metadata.mediaType === 'video' ||
+              media.serialNumber === 13
+            ) || null}
           />
-        </main>
+        </div> */}
 
-        {/* Modals */}
-        <UploadModal
-          isOpen={isUploadModalOpen}
-          onClose={() => setIsUploadModalOpen(false)}
-          onUploadComplete={handleUploadComplete}
+        {/* Gallery */}
+        <GalleryGrid
+          media={filteredMedia}
+          isLoading={isLoading || isSearching}
+          onMediaClick={setSelectedMedia}
+          onRefresh={handleRefresh}
         />
+      </main>
 
-        <MediaViewer
-          media={selectedMedia}
-          isOpen={!!selectedMedia}
-          onClose={() => setSelectedMedia(null)}
-        />
-      </div>
-    </WalletProvider>
+      {/* Modals */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadComplete={handleUploadComplete}
+      />
+
+      <MediaViewer
+        media={selectedMedia}
+        isOpen={!!selectedMedia}
+        onClose={() => setSelectedMedia(null)}
+      />
+    </div>
   );
 };
 
