@@ -30,13 +30,8 @@ export default defineConfig(({ mode }) => ({
         'os',
       ],
       output: {
-        manualChunks: {
-          // Separate vendor chunks
-          'react-vendor': ['react', 'react-dom'],
-          'hedera-vendor': ['@hashgraph/sdk'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-slot'],
-          'wallet-vendor': ['@hashconnect/sdk'],
-        },
+        // Let Vite handle chunking automatically
+        manualChunks: undefined,
       },
     },
   },
