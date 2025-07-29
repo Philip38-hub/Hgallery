@@ -43,8 +43,27 @@ serve(async (req) => {
     const hederaOperatorId = Deno.env.get('HEDERA_OPERATOR_ID');
     const hederaOperatorKey = Deno.env.get('HEDERA_OPERATOR_KEY');
 
+    console.log('Environment check:', {
+      network: hederaNetwork,
+      hasOperatorId: !!hederaOperatorId,
+      hasOperatorKey: !!hederaOperatorKey,
+    });
+
     if (!hederaOperatorId || !hederaOperatorKey) {
-      throw new Error('Missing required environment variables');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required environment variables',
+          details: {
+            hasOperatorId: !!hederaOperatorId,
+            hasOperatorKey: !!hederaOperatorKey,
+          }
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Parse request body
@@ -202,8 +221,8 @@ serve(async (req) => {
 
     // Try to enhance with Supabase data if available
     try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      const supabaseUrl = Deno.env.get('PROJECT_URL');
+      const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY');
 
       if (supabaseUrl && supabaseServiceKey) {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);

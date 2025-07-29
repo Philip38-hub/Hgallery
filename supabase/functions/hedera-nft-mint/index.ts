@@ -154,8 +154,8 @@ serve(async (req) => {
 
     // Store in Supabase if available
     try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      const supabaseUrl = Deno.env.get('PROJECT_URL');
+      const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY');
 
       if (supabaseUrl && supabaseServiceKey) {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
