@@ -135,15 +135,50 @@ export class BackendService {
   }
 
   async getTokenInfo(): Promise<TokenInfoResponse> {
+    const tokenId = import.meta.env.VITE_NFT_COLLECTION_ID;
+
+    if (!tokenId) {
+      return {
+        success: false,
+        error: 'NFT Collection ID not configured'
+      };
+    }
+
+    // Try Supabase Edge Function first
+    if (supabaseService.isAvailable()) {
+      try {
+        console.log('🔄 Fetching token info via Supabase Edge Function...');
+        const result = await supabaseService.callEdgeFunction('hedera-token-info', {
+          tokenId,
+          includeNFTs: true,
+          limit: 50,
+          offset: 0
+        });
+
+        if (result && result.success) {
+          console.log('✅ Token info fetched successfully via Supabase');
+          return result;
+        }
+      } catch (error) {
+        console.warn('⚠️ Supabase Edge Function failed, falling back to Express API:', error);
+      }
+    }
+
+    // Fallback to Express API
     try {
+      console.log('🔄 Fetching token info via Express API fallback...');
       const response = await axios.get(`${this.baseURL}/api/token-info`);
+      console.log('✅ Token info fetched successfully via Express API');
       return response.data;
     } catch (error) {
-      console.error('Error getting token info:', error);
+      console.error('❌ Both Supabase and Express API failed:', error);
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      throw error;
+      return {
+        success: false,
+        error: 'Failed to fetch token information'
+      };
     }
   }
 
@@ -218,17 +253,52 @@ export class BackendService {
   }
 
   async getCollectionNFTs(limit: number = 100, offset: number = 0): Promise<CollectionNFTsResponse> {
+    const tokenId = import.meta.env.VITE_NFT_COLLECTION_ID;
+
+    if (!tokenId) {
+      return {
+        success: false,
+        error: 'NFT Collection ID not configured'
+      };
+    }
+
+    // Try Supabase Edge Function first
+    if (supabaseService.isAvailable()) {
+      try {
+        console.log('🔄 Fetching collection NFTs via Supabase Edge Function...');
+        const result = await supabaseService.callEdgeFunction('hedera-token-info', {
+          tokenId,
+          includeNFTs: true,
+          limit,
+          offset,
+        });
+
+        if (result && result.success) {
+          console.log('✅ Collection NFTs fetched successfully via Supabase');
+          return result;
+        }
+      } catch (error) {
+        console.warn('⚠️ Supabase Edge Function failed, falling back to Express API:', error);
+      }
+    }
+
+    // Fallback to Express API
     try {
+      console.log('🔄 Fetching collection NFTs via Express API fallback...');
       const response = await axios.get(`${this.baseURL}/api/collection/nfts`, {
         params: { limit, offset }
       });
+      console.log('✅ Collection NFTs fetched successfully via Express API');
       return response.data;
     } catch (error) {
-      console.error('Error getting collection NFTs:', error);
+      console.error('❌ Both Supabase and Express API failed:', error);
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      throw error;
+      return {
+        success: false,
+        error: 'Failed to fetch collection NFTs'
+      };
     }
   }
 }

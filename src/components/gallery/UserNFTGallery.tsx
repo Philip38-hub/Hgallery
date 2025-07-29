@@ -61,87 +61,70 @@ export const UserNFTGallery: React.FC<UserNFTGalleryProps> = ({ onNFTSelect }) =
 
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      // Get account balance to find NFTs
-      const balanceResponse = await backendService.getAccountBalance(wallet.accountId);
-      
-      if (!balanceResponse.success || !balanceResponse.data) {
-        throw new Error('Failed to get account balance');
+      console.log('🔄 Loading NFTs for account:', wallet.accountId);
+
+      // Get all NFTs from the collection
+      const collectionResponse = await backendService.getCollectionNFTs(100, 0);
+
+      if (!collectionResponse.success) {
+        throw new Error(collectionResponse.error || 'Failed to fetch collection NFTs');
       }
 
-      const tokens = balanceResponse.data.tokens;
-      const tokenInfoResponse = await backendService.getTokenInfo();
-      
-      if (!tokenInfoResponse.success || !tokenInfoResponse.data) {
-        throw new Error('Failed to get token info');
-      }
+      const allNFTs = collectionResponse.data?.nfts || [];
+      console.log('📦 Found', allNFTs.length, 'NFTs in collection');
 
-      const collectionTokenId = tokenInfoResponse.data.tokenId;
-      
-      // Check if user has any NFTs from our collection
-      const userNFTCount = tokens[collectionTokenId] || 0;
-      
-      if (userNFTCount === 0) {
-        setNfts([]);
-        return;
-      }
+      // Filter NFTs owned by the current user
+      const userNFTs: NFTData[] = allNFTs
+        .filter((nft: any) => nft.accountId === wallet.accountId)
+        .map((nft: any) => ({
+          tokenId: nft.tokenId,
+          serialNumber: nft.serialNumber,
+          accountId: nft.accountId,
+          metadata: nft.metadata,
+          createdAt: nft.createdAt,
+          metadataContent: nft.metadataContent,
+        }));
 
-      // For now, we'll need to iterate through possible serial numbers
-      // In a production app, you'd use the Hedera Mirror Node API for this
-      const userNFTs: NFTData[] = [];
-      
-      // Get token info to find total supply
-      const totalSupply = parseInt(tokenInfoResponse.data.totalSupply);
-      
-      // Check each NFT to see if it belongs to the user
-      // Note: This is not efficient for large collections
-      // In production, use Mirror Node API to query NFTs by owner
-      for (let serial = 1; serial <= Math.min(totalSupply, 100); serial++) {
-        try {
-          const nftResponse = await backendService.getNFTInfo(serial);
-          
-          if (nftResponse.success && nftResponse.data && 
-              nftResponse.data.accountId === wallet.accountId) {
-            
-            const nftData: NFTData = {
-              ...nftResponse.data,
-              metadataContent: null,
-              imageUrl: null
-            };
+      console.log('👤 User owns', userNFTs.length, 'NFTs');
 
-            // Load metadata content if it's an IPFS URL
-            if (nftData.metadata?.metadataUrl) {
-              try {
-                const metadataUrl = nftData.metadata.metadataUrl;
-                if (metadataUrl.startsWith('ipfs://')) {
-                  const hash = metadataUrl.replace('ipfs://', '');
-                  const metadataContent = await ipfsService.getJSON(hash);
-                  nftData.metadataContent = metadataContent;
-                  
-                  // Extract image URL
-                  if (metadataContent.image) {
-                    if (metadataContent.image.startsWith('ipfs://')) {
-                      const imageHash = metadataContent.image.replace('ipfs://', '');
-                      nftData.imageUrl = ipfsService.getGatewayUrl(imageHash);
-                    } else {
-                      nftData.imageUrl = metadataContent.image;
-                    }
-                  }
+      // Load metadata for each NFT
+      for (const nft of userNFTs) {
+        // Load metadata content if not already available
+        if (!nft.metadataContent && nft.metadata?.metadataUrl) {
+          try {
+            const metadataUrl = nft.metadata.metadataUrl;
+            if (metadataUrl.startsWith('ipfs://')) {
+              const hash = metadataUrl.replace('ipfs://', '');
+              const metadataContent = await ipfsService.getJSON(hash);
+              nft.metadataContent = metadataContent;
+
+              // Extract image URL
+              if (metadataContent.image) {
+                if (metadataContent.image.startsWith('ipfs://')) {
+                  const imageHash = metadataContent.image.replace('ipfs://', '');
+                  nft.imageUrl = ipfsService.getGatewayUrl(imageHash);
+                } else {
+                  nft.imageUrl = metadataContent.image;
                 }
-              } catch (metadataError) {
-                console.warn(`Failed to load metadata for NFT ${serial}:`, metadataError);
               }
             }
-
-            userNFTs.push(nftData);
+          } catch (metadataError) {
+            console.warn(`Failed to load metadata for NFT ${nft.serialNumber}:`, metadataError);
           }
-        } catch (nftError) {
-          // NFT might not exist or be accessible, continue
-          console.debug(`NFT ${serial} not found or not accessible`);
+        } else if (nft.metadataContent?.image) {
+          // Extract image URL from existing metadata
+          if (nft.metadataContent.image.startsWith('ipfs://')) {
+            const imageHash = nft.metadataContent.image.replace('ipfs://', '');
+            nft.imageUrl = ipfsService.getGatewayUrl(imageHash);
+          } else {
+            nft.imageUrl = nft.metadataContent.image;
+          }
         }
       }
 
+      console.log('✅ Loaded metadata for', userNFTs.length, 'NFTs');
       setNfts(userNFTs);
       
     } catch (error) {
