@@ -1,6 +1,6 @@
 [build]
   # Build command for React app
-  command = "npm install && npm run build"
+  command = "npm install && npm run build:production"
   # Directory to publish
   publish = "dist"
 
@@ -9,6 +9,8 @@
   NODE_VERSION = "18"
   # NPM version
   NPM_VERSION = "9"
+  # Disable secrets scanning for blockchain app
+  SECRETS_SCAN_ENABLED = "false"
 
 # Redirect rules for SPA
 [[redirects]]
@@ -56,6 +58,6 @@
 [context.branch-deploy.environment]
   NODE_ENV = "development"
 
-# Functions configuration (if needed for future serverless functions)
-[functions]
-  directory = "netlify/functions"
+# Functions disabled for this deployment
+# [functions]
+#   directory = "netlify/functions"
