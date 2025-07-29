@@ -17,10 +17,10 @@ interface TokenAssociationProps {
   onAssociationComplete?: () => void;
 }
 
-export const TokenAssociation: React.FC<TokenAssociationProps> = ({ 
-  onAssociationComplete 
+export const TokenAssociation: React.FC<TokenAssociationProps> = ({
+  onAssociationComplete
 }) => {
-  const { wallet, isWalletConnected, hashConnectService } = useWallet();
+  const { wallet, isWalletConnected, signTransaction } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [isAssociated, setIsAssociated] = useState<boolean | null>(null);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
@@ -71,7 +71,7 @@ export const TokenAssociation: React.FC<TokenAssociationProps> = ({
   };
 
   const associateToken = async () => {
-    if (!isWalletConnected || !wallet?.accountId || !hashConnectService) {
+    if (!isWalletConnected || !wallet?.accountId) {
       toast({
         title: "Wallet Not Connected",
         description: "Please connect your HashPack wallet first.",
@@ -99,10 +99,10 @@ export const TokenAssociation: React.FC<TokenAssociationProps> = ({
         .setTokenIds([TokenId.fromString(tokenInfo.tokenId)])
         .setTransactionMemo('Hgallery NFT Collection Association');
 
-      console.log('Signing transaction with HashConnect...');
-      
-      // Sign and execute transaction through HashConnect
-      const transactionId = await hashConnectService.signTransaction(associateTx);
+      console.log('Signing transaction with wallet...');
+
+      // Sign and execute transaction through wallet
+      const transactionId = await signTransaction(associateTx);
       
       console.log('Token association successful:', transactionId);
       

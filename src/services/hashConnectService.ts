@@ -21,7 +21,7 @@ export class HashConnectService {
   private appMetadata = {
     name: import.meta.env.VITE_HASHCONNECT_APP_NAME || 'Hedera Gallery',
     description: import.meta.env.VITE_HASHCONNECT_APP_DESCRIPTION || 'Decentralized Media NFT Gallery',
-    icons: [import.meta.env.VITE_HASHCONNECT_ICON_URL || '/favicon.ico'],
+    icons: [import.meta.env.VITE_HASHCONNECT_ICON_URL || '/logo.png'],
     url: window.location.origin
   };
 

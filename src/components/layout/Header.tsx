@@ -18,17 +18,15 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
 
   return (
     <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-card">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between overflow-hidden">
         {/* Logo and Title */}
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-primary">
+            {/* <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-primary">
               <Zap className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Hedera Gallery
-              </h1>
+            </div> */}
+            <div className="mt-3">
+              <img src="/logo.png" alt="Harchive Logo" className="h-40 w-auto"/>
               <p className="text-xs text-muted-foreground">Decentralized Media NFTs</p>
             </div>
           </Link>
@@ -46,14 +44,6 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
                 }`}
               >
                 Gallery
-              </Link>
-              <Link
-                to="/my-content"
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  location.pathname === '/my-content' ? 'text-primary' : 'text-muted-foreground'
-                }`}
-              >
-                My Content
               </Link>
               <Link
                 to="/mint"

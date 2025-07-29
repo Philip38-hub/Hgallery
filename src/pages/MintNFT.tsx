@@ -27,7 +27,7 @@ const MintNFTContent: React.FC = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [activeTab, setActiveTab] = useState('mint');
+  const [activeTab, setActiveTab] = useState('associate');
 
   useEffect(() => {
     checkBackendStatus();
@@ -84,9 +84,12 @@ const MintNFTContent: React.FC = () => {
             <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
               Mint Your NFT
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Upload your media, mint it as an NFT on Hedera, and manage your collection
-            </p>
+            <ul className="list-disc list-inside text-muted-foreground">
+              <li>Associate account to token collection</li>
+              <li>Upload your media</li>
+              <li>Mint it as an NFT on Hedera</li>
+              <li>View and manage your NFTs/Media</li>
+            </ul>
           </div>
 
           {/* Backend Status */}
@@ -136,13 +139,13 @@ const MintNFTContent: React.FC = () => {
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="mint" className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Mint NFT
-              </TabsTrigger>
               <TabsTrigger value="associate" className="flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
                 Token Association
+              </TabsTrigger>
+              <TabsTrigger value="mint" className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Mint NFT
               </TabsTrigger>
               <TabsTrigger value="gallery" className="flex items-center gap-2">
                 <ImageIcon className="h-4 w-4" />

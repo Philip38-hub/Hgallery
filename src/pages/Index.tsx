@@ -368,8 +368,8 @@ const Index = () => {
               Hedera Gallery
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Discover, upload, and trade media NFTs on the Hedera blockchain. 
-              Every piece is authenticated and stored permanently on IPFS.
+              Discover, upload, and trade media NFTs on the Hedera blockchain.<br/>
+              <strong>Record History a fresh.</strong>
             </p>
           </div>
 
