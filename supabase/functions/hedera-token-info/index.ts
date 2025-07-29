@@ -86,13 +86,16 @@ serve(async (req) => {
     }
 
     // Initialize Hedera client
-    const client = hederaNetwork === 'mainnet' 
-      ? Client.forMainnet() 
+    const client = hederaNetwork === 'mainnet'
+      ? Client.forMainnet()
       : Client.forTestnet();
-    
+
+    // Use ECDSA format (confirmed working from tests)
+    const privateKey = PrivateKey.fromStringECDSA(hederaOperatorKey);
+
     client.setOperator(
       AccountId.fromString(hederaOperatorId),
-      PrivateKey.fromStringDer(hederaOperatorKey)
+      privateKey
     );
 
     let responseData: any = {};

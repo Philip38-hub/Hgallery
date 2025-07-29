@@ -215,6 +215,9 @@ class SupabaseService {
   async getTokenInfo(tokenId: string): Promise<any> {
     return this.callEdgeFunction('hedera-token-info', {
       tokenId,
+      includeNFTs: true,
+      limit: 50,
+      offset: 0,
     });
   }
 

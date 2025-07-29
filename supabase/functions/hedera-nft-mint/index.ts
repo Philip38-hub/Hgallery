@@ -85,7 +85,7 @@ serve(async (req) => {
     
     client.setOperator(
       AccountId.fromString(hederaOperatorId),
-      PrivateKey.fromStringDer(hederaOperatorKey)
+      PrivateKey.fromStringECDSA(hederaOperatorKey)
     );
 
     console.log(`🔨 Minting NFT with metadata: ${metadataUrl}`);
@@ -99,7 +99,7 @@ serve(async (req) => {
       .setMetadata([metadataBytes])
       .freezeWith(client);
 
-    const mintSigned = await mintTransaction.sign(PrivateKey.fromStringDer(nftSupplyKey));
+    const mintSigned = await mintTransaction.sign(PrivateKey.fromStringECDSA(nftSupplyKey));
     const mintResponse = await mintSigned.execute(client);
     const mintReceipt = await mintResponse.getReceipt(client);
 
@@ -134,7 +134,7 @@ serve(async (req) => {
           )
           .freezeWith(client);
 
-        const transferSigned = await transferTransaction.sign(PrivateKey.fromStringDer(hederaOperatorKey));
+        const transferSigned = await transferTransaction.sign(PrivateKey.fromStringECDSA(hederaOperatorKey));
         const transferResponse = await transferSigned.execute(client);
         const transferReceipt = await transferResponse.getReceipt(client);
 
