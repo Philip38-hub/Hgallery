@@ -19,10 +19,38 @@ A complete decentralized video and photo gallery built on the Hedera blockchain 
 ## Tech Stack
 
 - **Frontend**: React 18, TypeScript, Tailwind CSS, shadcn/ui
-- **Blockchain**: Hedera Hashgraph (Testnet)
+- **Backend**: Supabase Edge Functions + Express.js fallback
+- **Database**: PostgreSQL (Supabase)
+- **Blockchain**: Hedera Hashgraph (Testnet/Mainnet)
 - **Storage**: IPFS via Pinata
 - **Wallet**: HashPack via HashConnect
+- **Deployment**: Netlify (Frontend) + Supabase (Backend)
 - **Icons**: Lucide React
+
+## 🚀 Quick Deploy
+
+### Option 1: Automated Setup
+```bash
+npm install
+cp .env.example .env
+# Fill in your environment variables in .env
+tsx scripts/setup-deployment.ts
+```
+
+### Option 2: Manual Deployment
+1. **Deploy to Supabase**: Follow [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+2. **Deploy to Netlify**: Connect your GitHub repo to Netlify
+3. **Configure Environment Variables**: Set all required variables in both platforms
+
+### Option 3: One-Click Deploy
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/your-username/hgallery)
+
+## 📚 Documentation
+
+- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Complete deployment instructions
+- [Backend Setup](./BACKEND_SETUP.md) - Backend configuration details
+- [MVP Demo Guide](./MVP_DEMO_GUIDE.md) - Demo walkthrough
+- [NFT Setup Guide](./NFT_SETUP_GUIDE.md) - NFT collection setup
 
 ## Prerequisites
 

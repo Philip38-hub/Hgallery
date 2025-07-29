@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabaseService } from './supabaseService';
 
 // Handle both browser (Vite) and Node.js environments
 const getApiBaseUrl = () => {
@@ -113,13 +114,24 @@ export class BackendService {
   }
 
   async healthCheck(): Promise<any> {
+    const health = {
+      supabase: supabaseService.isAvailable(),
+      express: false,
+      expressData: null as any,
+    };
+
     try {
-      const response = await axios.get(`${this.baseURL}/api/health`);
-      return response.data;
+      const response = await axios.get(`${this.baseURL}/api/health`, { timeout: 5000 });
+      health.express = true;
+      health.expressData = response.data;
     } catch (error) {
-      console.error('Backend health check failed:', error);
-      throw new Error('Backend service is not available');
+      console.warn('Express API health check failed:', error);
     }
+
+    return {
+      success: health.supabase || health.express,
+      services: health,
+    };
   }
 
   async getTokenInfo(): Promise<TokenInfoResponse> {
@@ -136,11 +148,29 @@ export class BackendService {
   }
 
   async mintNFT(request: MintNFTRequest): Promise<MintNFTResponse> {
+    // Try Supabase Edge Function first
+    if (supabaseService.isAvailable()) {
+      try {
+        console.log('🔄 Attempting to mint NFT via Supabase Edge Function...');
+        const result = await supabaseService.mintNFT(request.metadataUrl, request.userAccountId);
+
+        if (result && result.success) {
+          console.log('✅ NFT minted successfully via Supabase');
+          return result;
+        }
+      } catch (error) {
+        console.warn('⚠️ Supabase Edge Function failed, falling back to Express API:', error);
+      }
+    }
+
+    // Fallback to Express API
     try {
+      console.log('🔄 Attempting to mint NFT via Express API fallback...');
       const response = await axios.post(`${this.baseURL}/api/mint-nft`, request);
+      console.log('✅ NFT minted successfully via Express API');
       return response.data;
     } catch (error) {
-      console.error('Error minting NFT:', error);
+      console.error('❌ Both Supabase and Express API failed:', error);
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
