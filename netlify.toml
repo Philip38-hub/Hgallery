@@ -1,6 +1,6 @@
 [build]
   # Build command for React app
-  command = "npm ci && npm run build"
+  command = "npm install && npm run build"
   # Directory to publish
   publish = "dist"
 
@@ -9,8 +9,6 @@
   NODE_VERSION = "18"
   # NPM version
   NPM_VERSION = "9"
-  # Ensure dev dependencies are installed
-  NPM_FLAGS = "--include=dev"
 
 # Redirect rules for SPA
 [[redirects]]
