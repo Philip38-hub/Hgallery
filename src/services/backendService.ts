@@ -155,10 +155,51 @@ export class BackendService {
     // Use cache to avoid repeated API calls
     const cacheKey = `token-info-${tokenId}`;
     return cacheService.getOrSet(cacheKey, async () => {
-      // Try Supabase Edge Function first
+      // Try Supabase Edge Function first (direct fetch)
+      try {
+        console.log('🔄 Fetching token info via Supabase Edge Function (direct)...');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        if (supabaseUrl && supabaseAnonKey) {
+          const response = await fetch(`${supabaseUrl}/functions/v1/hedera-mirror-nfts`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              tokenId,
+              includeNFTs: true,
+              limit: 50,
+              offset: 0
+            })
+          });
+
+          console.log('📋 Direct fetch response status:', response.status);
+          console.log('📋 Direct fetch response headers:', Object.fromEntries(response.headers.entries()));
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('📋 Direct fetch result:', result);
+
+            if (result && result.success) {
+              console.log('✅ Token info fetched successfully via direct fetch');
+              return result;
+            }
+          } else {
+            const errorText = await response.text();
+            console.error('❌ Direct fetch failed with status:', response.status, errorText);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Direct fetch failed:', error);
+      }
+
+      // Fallback: Try Supabase client
       if (supabaseService.isAvailable()) {
         try {
-          console.log('🔄 Fetching token info via Supabase Edge Function...');
+          console.log('🔄 Fetching token info via Supabase client...');
           const result = await supabaseService.callEdgeFunction('hedera-mirror-nfts', {
             tokenId,
             includeNFTs: true,
@@ -166,12 +207,17 @@ export class BackendService {
             offset: 0
           });
 
+          console.log('📋 Supabase client result:', result);
+
           if (result && result.success) {
-            console.log('✅ Token info fetched successfully via Supabase');
+            console.log('✅ Token info fetched successfully via Supabase client');
             return result;
+          } else {
+            console.warn('⚠️ Supabase client returned unsuccessful result:', result);
           }
         } catch (error) {
-          console.warn('⚠️ Supabase Edge Function failed, falling back to Express API:', error);
+          console.error('❌ Supabase client failed:', error);
+          console.warn('⚠️ Falling back to Express API');
         }
       }
 
@@ -309,10 +355,50 @@ export class BackendService {
     // Use cache to avoid repeated API calls
     const cacheKey = `collection-nfts-${tokenId}-${limit}-${offset}`;
     return cacheService.getOrSet(cacheKey, async () => {
-      // Try Supabase Edge Function first
+      // Try Supabase Edge Function first (direct fetch)
+      try {
+        console.log('🔄 Fetching collection NFTs via Supabase Edge Function (direct)...');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        if (supabaseUrl && supabaseAnonKey) {
+          const response = await fetch(`${supabaseUrl}/functions/v1/hedera-mirror-nfts`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              tokenId,
+              includeNFTs: true,
+              limit,
+              offset,
+            })
+          });
+
+          console.log('📋 Direct fetch response status for collection NFTs:', response.status);
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('📋 Direct fetch result for collection NFTs:', result);
+
+            if (result && result.success) {
+              console.log('✅ Collection NFTs fetched successfully via direct fetch');
+              return result;
+            }
+          } else {
+            const errorText = await response.text();
+            console.error('❌ Direct fetch failed for collection NFTs with status:', response.status, errorText);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Direct fetch failed for collection NFTs:', error);
+      }
+
+      // Fallback: Try Supabase client
       if (supabaseService.isAvailable()) {
         try {
-          console.log('🔄 Fetching collection NFTs via Supabase Edge Function...');
+          console.log('🔄 Fetching collection NFTs via Supabase client...');
           const result = await supabaseService.callEdgeFunction('hedera-mirror-nfts', {
             tokenId,
             includeNFTs: true,
@@ -320,12 +406,17 @@ export class BackendService {
             offset,
           });
 
+          console.log('📋 Supabase client result for collection NFTs:', result);
+
           if (result && result.success) {
-            console.log('✅ Collection NFTs fetched successfully via Supabase');
+            console.log('✅ Collection NFTs fetched successfully via Supabase client');
             return result;
+          } else {
+            console.warn('⚠️ Supabase client returned unsuccessful result:', result);
           }
         } catch (error) {
-          console.warn('⚠️ Supabase Edge Function failed, falling back to Express API:', error);
+          console.error('❌ Supabase client failed for collection NFTs:', error);
+          console.warn('⚠️ Falling back to Express API');
         }
       }
 

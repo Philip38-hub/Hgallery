@@ -191,15 +191,22 @@ class SupabaseService {
     if (!this.isAvailable()) return null;
 
     try {
+      console.log(`🔄 Calling edge function ${functionName} with payload:`, payload);
+
       const { data, error } = await this.supabase!.functions.invoke(functionName, {
         body: payload,
       });
 
-      if (error) throw error;
+      console.log(`📋 Edge function ${functionName} response:`, { data, error });
+
+      if (error) {
+        console.error(`❌ Edge function ${functionName} error:`, error);
+        throw error;
+      }
       return data;
     } catch (error) {
-      console.error(`Error calling edge function ${functionName}:`, error);
-      return null;
+      console.error(`❌ Error calling edge function ${functionName}:`, error);
+      throw error; // Re-throw instead of returning null to preserve error information
     }
   }
 

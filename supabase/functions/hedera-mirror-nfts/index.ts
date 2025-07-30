@@ -3,6 +3,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+  'Access-Control-Max-Age': '86400',
 }
 
 interface TokenInfoRequest {
@@ -15,17 +17,41 @@ interface TokenInfoRequest {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    console.log('🔍 Handling OPTIONS preflight request');
+    return new Response('ok', {
+      status: 200,
+      headers: corsHeaders
+    })
   }
 
   try {
+    console.log(`🔍 Request method: ${req.method}`);
+    console.log(`🔍 Request headers:`, Object.fromEntries(req.headers.entries()));
+
     // Parse request body
-    const { 
-      tokenId, 
-      includeNFTs = false, 
-      limit = 50, 
-      offset = 0 
-    }: TokenInfoRequest = await req.json();
+    const requestBody = await req.text();
+    console.log(`🔍 Request body:`, requestBody);
+
+    let parsedBody: TokenInfoRequest;
+    try {
+      parsedBody = JSON.parse(requestBody);
+    } catch (parseError) {
+      console.error('❌ Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const {
+      tokenId,
+      includeNFTs = false,
+      limit = 50,
+      offset = 0
+    } = parsedBody;
 
     if (!tokenId) {
       return new Response(
