@@ -31,7 +31,7 @@ export class IPFSService {
       'https://cloudflare-ipfs.com',
       'https://dweb.link',
       'https://gateway.pinata.cloud',
-      'https://ipfs.filebase.io'
+      'https://4everland.io'
     ];
 
     if (!jwt) {
@@ -78,22 +78,14 @@ export class IPFSService {
   }
 
   async getFile(hash: string): Promise<Response> {
-    try {
-      const response = await fetch(`${this.gatewayUrl}/ipfs/${hash}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file: ${response.statusText}`);
-      }
-      return response;
-    } catch (error) {
-      console.error('Error fetching file from IPFS:', error);
-      throw error;
-    }
+    // Use fallback logic by default for better reliability
+    return this.getFileWithFallback(hash);
   }
 
   async getJSON(hash: string): Promise<any> {
     try {
       console.log(`🔍 Fetching JSON from IPFS hash: ${hash}`);
-      const response = await this.getFile(hash);
+      const response = await this.getFileWithFallback(hash);
       const jsonData = await response.json();
       console.log(`✅ Successfully fetched JSON from IPFS:`, jsonData);
       return jsonData;
@@ -112,6 +104,32 @@ export class IPFSService {
    */
   getGatewayUrls(hash: string): string[] {
     return this.fallbackGateways.map(gateway => `${gateway}/ipfs/${hash}`);
+  }
+
+  /**
+   * Check if IPFS content exists using HEAD request
+   */
+  async checkIPFSExists(hash: string): Promise<boolean> {
+    const gateways = this.getGatewayUrls(hash);
+
+    for (const gatewayUrl of gateways) {
+      try {
+        const response = await fetch(gatewayUrl, {
+          method: 'HEAD',
+          headers: { 'Accept': '*/*' },
+        });
+
+        if (response.ok) {
+          console.log(`✅ IPFS content exists at: ${gatewayUrl}`);
+          return true;
+        }
+      } catch (error) {
+        // Continue to next gateway
+      }
+    }
+
+    console.warn(`❌ IPFS content not found on any gateway: ${hash}`);
+    return false;
   }
 
   /**
@@ -135,8 +153,8 @@ export class IPFSService {
           console.log(`✅ Successfully fetched from: ${gatewayUrl}`);
           return response;
         } else {
-          console.warn(`❌ Gateway ${gatewayUrl} failed with status: ${response.status}`);
-          lastError = new Error(`Gateway failed with status: ${response.status}`);
+          console.warn(`❌ Gateway ${gatewayUrl} failed with status: ${response.status} ${response.statusText}`);
+          lastError = new Error(`Gateway failed with status: ${response.status} ${response.statusText}`);
         }
       } catch (error) {
         console.warn(`❌ Gateway ${gatewayUrl} error:`, error);
@@ -145,7 +163,8 @@ export class IPFSService {
       }
     }
 
-    throw lastError || new Error('All IPFS gateways failed');
+    console.error(`❌ All IPFS gateways failed for hash: ${hash}`);
+    throw lastError || new Error(`All IPFS gateways failed for hash: ${hash}`);
   }
 
   async pinFile(hash: string): Promise<void> {

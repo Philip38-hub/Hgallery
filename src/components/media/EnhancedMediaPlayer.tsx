@@ -44,7 +44,7 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
     `https://cloudflare-ipfs.com/ipfs/${media.ipfsHash}`,
     `https://dweb.link/ipfs/${media.ipfsHash}`,
     `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`,
-    `https://ipfs.filebase.io/ipfs/${media.ipfsHash}`
+    `https://4everland.io/ipfs/${media.ipfsHash}`
   ];
 
   const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);

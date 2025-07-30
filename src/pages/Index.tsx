@@ -83,32 +83,12 @@ const convertNFTToMediaNFT = async (nft: any): Promise<MediaNFT | null> => {
         const metadataUrl = nft.metadata.metadataUrl;
         if (metadataUrl.startsWith('ipfs://')) {
           const hash = metadataUrl.replace('ipfs://', '');
-          // Try multiple IPFS gateways for better reliability
-          const gateways = [
-            `https://ipfs.io/ipfs/${hash}`,
-            `https://gateway.pinata.cloud/ipfs/${hash}`,
-            `https://cloudflare-ipfs.com/ipfs/${hash}`
-          ];
-
-          let metadataFetched = false;
-          for (const gatewayUrl of gateways) {
-            try {
-              const response = await fetch(gatewayUrl);
-              if (response.ok) {
-                metadataContent = await response.json();
-                console.log(`✅ Fetched metadata for NFT #${nft.serialNumber} from ${gatewayUrl}:`, metadataContent);
-                metadataFetched = true;
-                break;
-              } else {
-                console.warn(`❌ Gateway ${gatewayUrl} failed with status: ${response.status}`);
-              }
-            } catch (gatewayError) {
-              console.warn(`❌ Gateway ${gatewayUrl} error:`, gatewayError);
-            }
-          }
-
-          if (!metadataFetched) {
-            console.warn(`❌ All gateways failed for NFT #${nft.serialNumber}`);
+          // Use improved IPFS service with fallback logic
+          try {
+            metadataContent = await ipfsService.getJSON(hash);
+            console.log(`✅ Fetched metadata for NFT #${nft.serialNumber}:`, metadataContent);
+          } catch (ipfsError) {
+            console.warn(`❌ Failed to fetch metadata for NFT #${nft.serialNumber}:`, ipfsError);
           }
         }
       } catch (fetchError) {
