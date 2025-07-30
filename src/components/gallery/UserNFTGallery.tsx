@@ -4,18 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Loader2, 
-  Image as ImageIcon, 
-  ExternalLink, 
+import {
+  Loader2,
+  Image as ImageIcon,
+  ExternalLink,
   RefreshCw,
   AlertCircle,
-  Eye
+  Eye,
+  Send
 } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 import { backendService } from '@/services/backendService';
 import { ipfsService } from '@/services/ipfsService';
 import { toast } from '@/hooks/use-toast';
+import { TransferNFTModal } from '@/components/transfer/TransferNFTModal';
 
 // Component for NFT images with fallback gateway support
 const NFTImage: React.FC<{ nft: NFTData; className: string }> = ({ nft, className }) => {
@@ -195,6 +197,8 @@ export const UserNFTGallery: React.FC<UserNFTGalleryProps> = ({ onNFTSelect }) =
   const [isLoading, setIsLoading] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [selectedNFTForTransfer, setSelectedNFTForTransfer] = useState<NFTData | null>(null);
 
   useEffect(() => {
     if (isWalletConnected && wallet?.accountId) {
@@ -331,6 +335,20 @@ export const UserNFTGallery: React.FC<UserNFTGalleryProps> = ({ onNFTSelect }) =
     const network = 'testnet'; // or get from env
     const url = `https://hashscan.io/${network}/token/${tokenId}/${serialNumber}`;
     window.open(url, '_blank');
+  };
+
+  const handleTransferClick = (nft: NFTData) => {
+    setSelectedNFTForTransfer(nft);
+    setIsTransferModalOpen(true);
+  };
+
+  const handleTransferComplete = () => {
+    // Refresh the NFT list to reflect the transfer
+    loadUserNFTs();
+    toast({
+      title: "Transfer Complete",
+      description: "Your NFT gallery has been refreshed",
+    });
   };
 
   if (!isWalletConnected) {
@@ -472,11 +490,21 @@ export const UserNFTGallery: React.FC<UserNFTGalleryProps> = ({ onNFTSelect }) =
                           View
                         </Button>
                       )}
-                      
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTransferClick(nft)}
+                        title="Transfer NFT"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openOnHashScan(nft.tokenId, nft.serialNumber)}
+                        title="View on HashScan"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>
@@ -488,6 +516,17 @@ export const UserNFTGallery: React.FC<UserNFTGalleryProps> = ({ onNFTSelect }) =
           </div>
         )}
       </CardContent>
+
+      {/* Transfer NFT Modal */}
+      <TransferNFTModal
+        isOpen={isTransferModalOpen}
+        onClose={() => {
+          setIsTransferModalOpen(false);
+          setSelectedNFTForTransfer(null);
+        }}
+        nft={selectedNFTForTransfer}
+        onTransferComplete={handleTransferComplete}
+      />
     </Card>
   );
 };
