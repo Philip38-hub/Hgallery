@@ -10,6 +10,7 @@ import { hederaService } from '@/services/hederaService';
 import { ipfsService } from '@/services/ipfsService';
 import { backendService } from '@/services/backendService';
 import { toast } from '@/hooks/use-toast';
+import { Preloader } from '@/utils/preloader';
 
 // Mock data for demonstration
 const mockMediaData: MediaNFT[] = [
@@ -398,6 +399,11 @@ const Index = () => {
   // Load initial gallery data
   React.useEffect(() => {
     loadGalleryData();
+  }, []);
+
+  // Preload chunks after initial load for better UX
+  React.useEffect(() => {
+    Preloader.preloadAllChunks();
   }, []);
   return (
     <div className="min-h-screen bg-gradient-background">

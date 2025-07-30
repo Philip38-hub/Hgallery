@@ -6,6 +6,7 @@ import { Wallet, LogOut, Zap, User, QrCode } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useWallet } from '@/contexts/WalletContext';
 import { useState } from 'react';
+import { Preloader } from '@/utils/preloader';
 
 interface HeaderProps {
   onUploadClick?: () => void;
@@ -87,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
           ) : (
             <Button
               onClick={connectWallet}
+              onMouseEnter={() => Preloader.onWalletButtonHover()}
               disabled={isConnecting}
               className="bg-gradient-primary text-primary-foreground shadow-primary hover:shadow-primary/70 transition-all duration-300"
             >
