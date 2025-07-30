@@ -8,21 +8,40 @@ interface SimpleMediaPlayerProps {
   className?: string;
 }
 
-export const SimpleMediaPlayer: React.FC<SimpleMediaPlayerProps> = ({ 
-  media, 
-  className = "" 
+export const SimpleMediaPlayer: React.FC<SimpleMediaPlayerProps> = ({
+  media,
+  className = ""
 }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
 
-  const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`;
+  // Multiple IPFS gateways for better reliability
+  const ipfsGateways = [
+    `https://ipfs.io/ipfs/${media.ipfsHash}`,
+    `https://cloudflare-ipfs.com/ipfs/${media.ipfsHash}`,
+    `https://dweb.link/ipfs/${media.ipfsHash}`,
+    `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`,
+    `https://ipfs.filebase.io/ipfs/${media.ipfsHash}`
+  ];
+
+  const ipfsUrl = ipfsGateways[currentGatewayIndex];
   const isVideo = media.metadata.mediaType === 'video';
   const isAudio = media.metadata.mediaType === 'audio';
 
   const handleError = (error: any) => {
-    console.error('Media playback error:', error);
-    setHasError(true);
-    setIsLoading(false);
+    console.error('Media playback error with gateway:', ipfsUrl, error);
+
+    if (currentGatewayIndex < ipfsGateways.length - 1) {
+      console.log(`🔄 Trying next gateway (${currentGatewayIndex + 1}/${ipfsGateways.length})`);
+      setCurrentGatewayIndex(prev => prev + 1);
+      setHasError(false);
+      setIsLoading(true);
+    } else {
+      console.error('❌ All gateways failed for media:', media.metadata.title);
+      setHasError(true);
+      setIsLoading(false);
+    }
   };
 
   const handleLoadStart = () => {
@@ -102,6 +121,7 @@ export const SimpleMediaPlayer: React.FC<SimpleMediaPlayerProps> = ({
 
       {isVideo ? (
         <video
+          key={`video-${currentGatewayIndex}`}
           src={ipfsUrl}
           className="w-full h-full object-contain"
           controls
@@ -136,6 +156,7 @@ export const SimpleMediaPlayer: React.FC<SimpleMediaPlayerProps> = ({
           </div>
           
           <audio
+            key={`audio-${currentGatewayIndex}`}
             src={ipfsUrl}
             controls
             preload="metadata"

@@ -15,10 +15,32 @@ interface MediaCardProps {
 export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
 
-  const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`;
+  // Multiple IPFS gateways for better reliability
+  const ipfsGateways = [
+    `https://ipfs.io/ipfs/${media.ipfsHash}`,
+    `https://cloudflare-ipfs.com/ipfs/${media.ipfsHash}`,
+    `https://dweb.link/ipfs/${media.ipfsHash}`,
+    `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`,
+    `https://ipfs.filebase.io/ipfs/${media.ipfsHash}`
+  ];
+
+  const ipfsUrl = ipfsGateways[currentGatewayIndex];
   const isVideo = media.metadata.mediaType === 'video';
   const isAudio = media.metadata.mediaType === 'audio';
+
+  // Handle gateway fallback on error
+  const handleMediaError = () => {
+    if (currentGatewayIndex < ipfsGateways.length - 1) {
+      console.log(`🔄 MediaCard: Trying next gateway for ${media.metadata.title} (${currentGatewayIndex + 1}/${ipfsGateways.length})`);
+      setCurrentGatewayIndex(prev => prev + 1);
+      setImageError(false);
+    } else {
+      console.error('❌ MediaCard: All gateways failed for:', media.metadata.title);
+      setImageError(true);
+    }
+  };
 
   const formatFileSize = (bytes: number) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -40,10 +62,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
               {isVideo ? (
                 <div className="relative w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                   <video
+                    key={`video-${currentGatewayIndex}`}
                     src={ipfsUrl}
                     className="w-full h-full object-cover"
                     onLoadedData={() => setImageLoaded(true)}
-                    onError={() => setImageError(true)}
+                    onError={handleMediaError}
                     muted
                     playsInline
                   />
@@ -69,11 +92,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
                 </div>
               ) : (
                 <img
+                  key={`image-${currentGatewayIndex}`}
                   src={ipfsUrl}
                   alt={media.metadata.title}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   onLoad={() => setImageLoaded(true)}
-                  onError={() => setImageError(true)}
+                  onError={handleMediaError}
                 />
               )}
               

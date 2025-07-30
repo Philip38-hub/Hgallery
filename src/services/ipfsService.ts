@@ -19,10 +19,20 @@ export interface IPFSMetadata {
 export class IPFSService {
   private pinata: PinataSDK;
   private gatewayUrl: string;
+  private fallbackGateways: string[];
 
   constructor() {
     const jwt = import.meta.env.VITE_PINATA_JWT;
     this.gatewayUrl = import.meta.env.VITE_PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud';
+
+    // Multiple IPFS gateways for fallback and load distribution
+    this.fallbackGateways = [
+      'https://ipfs.io',
+      'https://cloudflare-ipfs.com',
+      'https://dweb.link',
+      'https://gateway.pinata.cloud',
+      'https://ipfs.filebase.io'
+    ];
 
     if (!jwt) {
       throw new Error('Pinata JWT token not configured');
@@ -95,6 +105,47 @@ export class IPFSService {
 
   getGatewayUrl(hash: string): string {
     return `${this.gatewayUrl}/ipfs/${hash}`;
+  }
+
+  /**
+   * Get multiple gateway URLs for a hash (for fallback)
+   */
+  getGatewayUrls(hash: string): string[] {
+    return this.fallbackGateways.map(gateway => `${gateway}/ipfs/${hash}`);
+  }
+
+  /**
+   * Try to fetch from multiple gateways with fallback
+   */
+  async getFileWithFallback(hash: string): Promise<Response> {
+    const gateways = this.getGatewayUrls(hash);
+    let lastError: Error | null = null;
+
+    for (const gatewayUrl of gateways) {
+      try {
+        console.log(`🔄 Trying IPFS gateway: ${gatewayUrl}`);
+        const response = await fetch(gatewayUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': '*/*',
+          },
+        });
+
+        if (response.ok) {
+          console.log(`✅ Successfully fetched from: ${gatewayUrl}`);
+          return response;
+        } else {
+          console.warn(`❌ Gateway ${gatewayUrl} failed with status: ${response.status}`);
+          lastError = new Error(`Gateway failed with status: ${response.status}`);
+        }
+      } catch (error) {
+        console.warn(`❌ Gateway ${gatewayUrl} error:`, error);
+        lastError = error as Error;
+        // Continue to next gateway
+      }
+    }
+
+    throw lastError || new Error('All IPFS gateways failed');
   }
 
   async pinFile(hash: string): Promise<void> {

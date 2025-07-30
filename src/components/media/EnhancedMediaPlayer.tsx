@@ -38,15 +38,37 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Try multiple IPFS gateways for better reliability
+  // Multiple IPFS gateways for better reliability
   const ipfsGateways = [
-    `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`,
     `https://ipfs.io/ipfs/${media.ipfsHash}`,
-    `https://cloudflare-ipfs.com/ipfs/${media.ipfsHash}`
+    `https://cloudflare-ipfs.com/ipfs/${media.ipfsHash}`,
+    `https://dweb.link/ipfs/${media.ipfsHash}`,
+    `https://gateway.pinata.cloud/ipfs/${media.ipfsHash}`,
+    `https://ipfs.filebase.io/ipfs/${media.ipfsHash}`
   ];
-  const ipfsUrl = ipfsGateways[0]; // Start with primary gateway
+
+  const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
+  const ipfsUrl = ipfsGateways[currentGatewayIndex];
   const isVideo = media.metadata.mediaType === 'video';
   const isAudio = media.metadata.mediaType === 'audio';
+
+  // Handle gateway fallback on error
+  const handleMediaError = (error: any) => {
+    console.error('Media error with gateway:', ipfsUrl, error);
+
+    if (currentGatewayIndex < ipfsGateways.length - 1) {
+      console.log(`🔄 Trying next gateway (${currentGatewayIndex + 1}/${ipfsGateways.length})`);
+      setCurrentGatewayIndex(prev => prev + 1);
+      setHasError(false);
+    } else {
+      console.error('❌ All gateways failed for media:', media.metadata.title);
+      setHasError(true);
+      if (onError) {
+        onError();
+      }
+    }
+  };
 
   useEffect(() => {
     const mediaElement = mediaRef.current;
@@ -197,6 +219,7 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
       {/* Media Element */}
       {isVideo ? (
         <video
+          key={`video-${currentGatewayIndex}`}
           ref={mediaRef as React.RefObject<HTMLVideoElement>}
           src={ipfsUrl}
           className="w-full h-full object-contain"
@@ -204,17 +227,7 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onLoadedMetadata={() => console.log('Video metadata loaded')}
-          onError={(e) => {
-            console.error('Video error:', e);
-            console.error('Failed video URL:', ipfsUrl);
-            console.error('Video element:', e.target);
-            if (e.target && e.target.error) {
-              console.error('Video error details:', {
-                code: e.target.error.code,
-                message: e.target.error.message
-              });
-            }
-          }}
+          onError={handleMediaError}
           preload="metadata"
           playsInline
           crossOrigin="anonymous"
@@ -222,12 +235,13 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
       ) : isAudio ? (
         <div className="w-full h-64 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
           <audio
+            key={`audio-${currentGatewayIndex}`}
             ref={mediaRef as React.RefObject<HTMLAudioElement>}
             src={ipfsUrl}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             onLoadedMetadata={() => console.log('Audio metadata loaded')}
-            onError={(e) => console.error('Audio error:', e)}
+            onError={handleMediaError}
             preload="metadata"
             crossOrigin="anonymous"
           />
