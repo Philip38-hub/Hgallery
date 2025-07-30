@@ -70,12 +70,52 @@ const mockMediaData: MediaNFT[] = [
 ];
 
 // Utility function to convert backend NFT data to MediaNFT format
-const convertNFTToMediaNFT = (nft: any): MediaNFT | null => {
+const convertNFTToMediaNFT = async (nft: any): Promise<MediaNFT | null> => {
   try {
     console.log(`🔄 Converting NFT #${nft.serialNumber}:`, nft);
 
-    // Check if we have metadata content from the backend
-    const metadataContent = nft.metadataContent;
+    // Check if we have metadata content from the backend, if not fetch it from IPFS
+    let metadataContent = nft.metadataContent;
+
+    if (!metadataContent && nft.metadata?.metadataUrl) {
+      console.log(`🔄 Fetching metadata content for NFT #${nft.serialNumber} from IPFS...`);
+      try {
+        const metadataUrl = nft.metadata.metadataUrl;
+        if (metadataUrl.startsWith('ipfs://')) {
+          const hash = metadataUrl.replace('ipfs://', '');
+          // Try multiple IPFS gateways for better reliability
+          const gateways = [
+            `https://ipfs.io/ipfs/${hash}`,
+            `https://gateway.pinata.cloud/ipfs/${hash}`,
+            `https://cloudflare-ipfs.com/ipfs/${hash}`
+          ];
+
+          let metadataFetched = false;
+          for (const gatewayUrl of gateways) {
+            try {
+              const response = await fetch(gatewayUrl);
+              if (response.ok) {
+                metadataContent = await response.json();
+                console.log(`✅ Fetched metadata for NFT #${nft.serialNumber} from ${gatewayUrl}:`, metadataContent);
+                metadataFetched = true;
+                break;
+              } else {
+                console.warn(`❌ Gateway ${gatewayUrl} failed with status: ${response.status}`);
+              }
+            } catch (gatewayError) {
+              console.warn(`❌ Gateway ${gatewayUrl} error:`, gatewayError);
+            }
+          }
+
+          if (!metadataFetched) {
+            console.warn(`❌ All gateways failed for NFT #${nft.serialNumber}`);
+          }
+        }
+      } catch (fetchError) {
+        console.warn(`❌ Error fetching metadata for NFT #${nft.serialNumber}:`, fetchError);
+      }
+    }
+
     if (!metadataContent) {
       console.warn(`NFT #${nft.serialNumber} has no metadata content`);
       return null;
@@ -298,12 +338,15 @@ const Index = () => {
 
       // Convert NFT data to MediaNFT format
       console.log(`🔄 Converting ${response.data.nfts?.length || 0} NFTs to MediaNFT format...`);
-      const mediaResults = (response.data.nfts || []).map(nft => {
+      const mediaPromises = (response.data.nfts || []).map(async (nft) => {
         console.log('🔄 Converting NFT:', nft);
-        const result = convertNFTToMediaNFT(nft);
+        const result = await convertNFTToMediaNFT(nft);
         console.log('✅ Converted to:', result);
         return result;
       });
+
+      // Wait for all conversions to complete
+      const mediaResults = await Promise.all(mediaPromises);
 
       // Filter out null results (failed conversions)
       const validMedia = mediaResults.filter((media): media is MediaNFT => media !== null);
