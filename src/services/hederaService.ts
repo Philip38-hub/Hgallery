@@ -62,9 +62,14 @@ export class HederaService {
       throw new Error('HederaService should not be used in browser environment. Use HederaClientService instead.');
     }
 
-    const network = process.env.HEDERA_NETWORK || 'testnet';
-    const opId = operatorId || process.env.HEDERA_OPERATOR_ID;
-    const opKey = operatorKey || process.env.HEDERA_OPERATOR_KEY;
+    // In production builds, prevent this service from being instantiated
+    if (import.meta.env.PROD && typeof window !== 'undefined') {
+      throw new Error('HederaService is not available in production client builds. Use backend API instead.');
+    }
+
+    const network = import.meta.env.VITE_HEDERA_NETWORK || 'testnet';
+    const opId = operatorId || import.meta.env.VITE_HEDERA_OPERATOR_ID;
+    const opKey = operatorKey || import.meta.env.VITE_HEDERA_OPERATOR_KEY;
 
     if (!opId || !opKey) {
       throw new Error('Hedera operator credentials not configured. Please set HEDERA_OPERATOR_ID and HEDERA_OPERATOR_KEY.');

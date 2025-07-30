@@ -26,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
               <Zap className="w-5 h-5 text-primary-foreground" />
             </div> */}
             <div className="mt-3">
-              <img src="/logo.png" alt="Harchive Logo" className="h-40 w-auto"/>
+              <img src="/logo.png" alt="Harchive Logo" className="h-auto w-32 pb-4"/>
             </div>
           </Link>
         </div>

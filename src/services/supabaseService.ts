@@ -213,7 +213,7 @@ class SupabaseService {
 
   // Get token info via Edge Function
   async getTokenInfo(tokenId: string): Promise<any> {
-    return this.callEdgeFunction('hedera-token-info', {
+    return this.callEdgeFunction('hedera-mirror-nfts', {
       tokenId,
       includeNFTs: true,
       limit: 50,

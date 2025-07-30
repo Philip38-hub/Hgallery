@@ -188,7 +188,8 @@ serve(async (req) => {
           for (let serial = startSerial; serial <= endSerial; serial++) {
             try {
               const nftInfoQuery = new TokenNftInfoQuery()
-                .setNftId(new NftId(TokenId.fromString(tokenId), serial));
+                .setTokenId(tokenId)
+                .setSerialNumber(serial);
 
               const nftInfo = await nftInfoQuery.execute(client);
               
@@ -198,8 +199,8 @@ serve(async (req) => {
               }
 
               nfts.push({
-                tokenId: nftInfo.nftId.tokenId.toString(),
-                serialNumber: nftInfo.nftId.serial.toNumber(),
+                tokenId: tokenId,
+                serialNumber: serial,
                 accountId: nftInfo.accountId.toString(),
                 createdAt: nftInfo.creationTime.toDate().toISOString(),
                 metadata: {

@@ -101,6 +101,7 @@ serve(async (req) => {
 
       } catch (nftError) {
         console.log(`NFT ${serial} error:`, nftError.message);
+        console.log(`NFT ${serial} full error:`, nftError);
       }
     }
 

@@ -264,8 +264,11 @@ const Index = () => {
 
       // First, get token info to find total supply
       const tokenInfoResponse = await backendService.getTokenInfo();
+      console.log('📋 Token info response:', tokenInfoResponse);
+
       if (!tokenInfoResponse.success || !tokenInfoResponse.data) {
-        console.warn('Failed to get token info, falling back to mock data');
+        console.warn('❌ Failed to get token info, falling back to mock data');
+        console.warn('Token info error:', tokenInfoResponse.error);
         setFilteredMedia(mockMediaData);
         return;
       }
@@ -281,23 +284,32 @@ const Index = () => {
 
       // Fetch NFTs from the collection
       const response = await backendService.getCollectionNFTs(limit, offset);
+      console.log('📦 Collection NFTs response:', response);
 
       if (!response.success || !response.data) {
-        console.warn('Failed to fetch collection NFTs, falling back to mock data');
+        console.warn('❌ Failed to fetch collection NFTs, falling back to mock data');
+        console.warn('Collection NFTs error:', response.error);
         setFilteredMedia(mockMediaData);
         return;
       }
 
-      console.log(`📦 Fetched ${response.data.nfts.length} NFTs from collection (serials ${offset + 1}-${offset + response.data.nfts.length})`);
+      console.log(`📦 Fetched ${response.data.nfts?.length || 0} NFTs from collection (serials ${offset + 1}-${offset + (response.data.nfts?.length || 0)})`);
+      console.log('🔍 Raw NFT data:', response.data.nfts);
 
       // Convert NFT data to MediaNFT format
-      console.log(`🔄 Converting ${response.data.nfts.length} NFTs to MediaNFT format...`);
-      const mediaResults = response.data.nfts.map(nft => convertNFTToMediaNFT(nft));
+      console.log(`🔄 Converting ${response.data.nfts?.length || 0} NFTs to MediaNFT format...`);
+      const mediaResults = (response.data.nfts || []).map(nft => {
+        console.log('🔄 Converting NFT:', nft);
+        const result = convertNFTToMediaNFT(nft);
+        console.log('✅ Converted to:', result);
+        return result;
+      });
 
       // Filter out null results (failed conversions)
       const validMedia = mediaResults.filter((media): media is MediaNFT => media !== null);
 
       console.log(`✅ Successfully converted ${validMedia.length} NFTs to media format`);
+      console.log('📋 Final media data:', validMedia);
       console.log('Valid media:', validMedia);
 
       // Log video NFTs specifically
