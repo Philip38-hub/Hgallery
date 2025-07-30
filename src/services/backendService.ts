@@ -5,7 +5,9 @@ import { supabaseService } from './supabaseService';
 const getApiBaseUrl = () => {
   // Browser environment (Vite)
   if (typeof window !== 'undefined') {
-    return import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3001';
+    // In production, if no API URL is set, return empty string to skip Express API calls
+    const apiUrl = import.meta.env?.VITE_API_BASE_URL;
+    return apiUrl || (import.meta.env.PROD ? '' : 'http://localhost:3001');
   }
   // Node.js environment
   if (typeof process !== 'undefined' && process.env) {
@@ -164,22 +166,27 @@ export class BackendService {
       }
     }
 
-    // Fallback to Express API
-    try {
-      console.log('🔄 Fetching token info via Express API fallback...');
-      const response = await axios.get(`${this.baseURL}/api/token-info`);
-      console.log('✅ Token info fetched successfully via Express API');
-      return response.data;
-    } catch (error) {
-      console.error('❌ Both Supabase and Express API failed:', error);
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
+    // Fallback to Express API (only if URL is configured)
+    if (this.baseURL) {
+      try {
+        console.log('🔄 Fetching token info via Express API fallback...');
+        const response = await axios.get(`${this.baseURL}/api/token-info`);
+        console.log('✅ Token info fetched successfully via Express API');
+        return response.data;
+      } catch (error) {
+        console.error('❌ Express API also failed:', error);
+        if (axios.isAxiosError(error) && error.response) {
+          return error.response.data;
+        }
       }
-      return {
-        success: false,
-        error: 'Failed to fetch token information'
-      };
+    } else {
+      console.log('⚠️ No Express API URL configured, skipping fallback');
     }
+
+    return {
+      success: false,
+      error: 'Failed to fetch token information - no backend services available'
+    };
   }
 
   async mintNFT(request: MintNFTRequest): Promise<MintNFTResponse> {
@@ -240,6 +247,15 @@ export class BackendService {
   }
 
   async getAccountBalance(accountId: string): Promise<AccountBalanceResponse> {
+    // Skip Express API calls in production if no URL is configured
+    if (!this.baseURL) {
+      console.log('⚠️ No Express API URL configured, skipping account balance check');
+      return {
+        success: false,
+        error: 'Express API not available in production'
+      };
+    }
+
     try {
       const response = await axios.get(`${this.baseURL}/api/balance/${accountId}`);
       return response.data;
@@ -248,7 +264,10 @@ export class BackendService {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      throw error;
+      return {
+        success: false,
+        error: 'Failed to get account balance'
+      };
     }
   }
 
@@ -282,24 +301,29 @@ export class BackendService {
       }
     }
 
-    // Fallback to Express API
-    try {
-      console.log('🔄 Fetching collection NFTs via Express API fallback...');
-      const response = await axios.get(`${this.baseURL}/api/collection/nfts`, {
-        params: { limit, offset }
-      });
-      console.log('✅ Collection NFTs fetched successfully via Express API');
-      return response.data;
-    } catch (error) {
-      console.error('❌ Both Supabase and Express API failed:', error);
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
+    // Fallback to Express API (only if URL is configured)
+    if (this.baseURL) {
+      try {
+        console.log('🔄 Fetching collection NFTs via Express API fallback...');
+        const response = await axios.get(`${this.baseURL}/api/collection/nfts`, {
+          params: { limit, offset }
+        });
+        console.log('✅ Collection NFTs fetched successfully via Express API');
+        return response.data;
+      } catch (error) {
+        console.error('❌ Express API also failed:', error);
+        if (axios.isAxiosError(error) && error.response) {
+          return error.response.data;
+        }
       }
-      return {
-        success: false,
-        error: 'Failed to fetch collection NFTs'
-      };
+    } else {
+      console.log('⚠️ No Express API URL configured, skipping fallback');
     }
+
+    return {
+      success: false,
+      error: 'Failed to fetch collection NFTs - no backend services available'
+    };
   }
 }
 

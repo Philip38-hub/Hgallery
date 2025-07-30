@@ -1,4 +1,4 @@
-import { AccountId, LedgerId, Transaction, TransactionId } from '@hashgraph/sdk';
+import { AccountId, LedgerId, Transaction, TransactionId, Client } from '@hashgraph/sdk';
 import { HashConnect, HashConnectConnectionState, SessionData } from 'hashconnect';
 import EventEmitter from "events";
 
@@ -253,6 +253,14 @@ export class HashConnectService {
       console.log('Sending transaction to HashConnect for signing...');
 
       try {
+        // Ensure transaction is properly prepared
+        if (!transaction.isFrozen()) {
+          console.log('Transaction not frozen, freezing with default client...');
+          // Create a minimal client for freezing
+          const client = Client.forTestnet();
+          transaction.freezeWith(client);
+        }
+
         // Use HashConnect v3 API
         const result = await this.hashconnect.sendTransaction(userAccountId, transaction);
 
