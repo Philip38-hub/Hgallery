@@ -62,14 +62,30 @@ export class HederaService {
       throw new Error('HederaService should not be used in browser environment. Use HederaClientService instead.');
     }
 
-    // In production builds, prevent this service from being instantiated
-    if (import.meta.env.PROD && typeof window !== 'undefined') {
-      throw new Error('HederaService is not available in production client builds. Use backend API instead.');
-    }
+    // Check if we're in a Node.js environment (server-side)
+    const isNodeEnvironment = typeof process !== 'undefined' && process.env;
 
-    const network = import.meta.env.VITE_HEDERA_NETWORK || 'testnet';
-    const opId = operatorId || import.meta.env.VITE_HEDERA_OPERATOR_ID;
-    const opKey = operatorKey || import.meta.env.VITE_HEDERA_OPERATOR_KEY;
+    // Get environment variables from the appropriate source
+    let network: string;
+    let opId: string | undefined;
+    let opKey: string | undefined;
+
+    if (isNodeEnvironment) {
+      // Node.js environment - use process.env
+      network = process.env.HEDERA_NETWORK || process.env.VITE_HEDERA_NETWORK || 'testnet';
+      opId = operatorId || process.env.HEDERA_OPERATOR_ID || process.env.VITE_HEDERA_OPERATOR_ID;
+      opKey = operatorKey || process.env.HEDERA_OPERATOR_KEY || process.env.VITE_HEDERA_OPERATOR_KEY;
+    } else {
+      // Browser environment with Vite - use import.meta.env
+      // In production builds, prevent this service from being instantiated
+      if (import.meta.env.PROD) {
+        throw new Error('HederaService is not available in production client builds. Use backend API instead.');
+      }
+
+      network = import.meta.env.VITE_HEDERA_NETWORK || 'testnet';
+      opId = operatorId || import.meta.env.VITE_HEDERA_OPERATOR_ID;
+      opKey = operatorKey || import.meta.env.VITE_HEDERA_OPERATOR_KEY;
+    }
 
     if (!opId || !opKey) {
       throw new Error('Hedera operator credentials not configured. Please set HEDERA_OPERATOR_ID and HEDERA_OPERATOR_KEY.');

@@ -146,6 +146,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         description: metadata.description || '',
         image: fileUpload.url,
         type: metadata.mediaType || 'image',
+        mediaType: metadata.mediaType || 'image', // Add explicit mediaType field
         attributes: (metadata.tags || []).map(tag => ({
           trait_type: 'Tag',
           value: tag
@@ -153,11 +154,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         properties: {
           creator: wallet.accountId,
           tags: metadata.tags || [],
+          mediaType: metadata.mediaType || 'image', // Also store in properties
           originalFileName: metadata.originalFileName || selectedFile.name,
           fileSize: selectedFile.size,
           uploadDate: new Date().toISOString()
         }
       };
+
+      console.log('🔍 Creating NFT metadata with mediaType:', metadata.mediaType);
+      console.log('📋 Full NFT metadata:', nftMetadata);
 
       const metadataUpload = await ipfsService.uploadMetadata(nftMetadata);
       setUploadProgress(prev => prev ? { ...prev, progress: 60 } : null);

@@ -255,18 +255,21 @@ export class BackendService {
         if (result && result.success) {
           console.log('✅ NFT minted successfully via Supabase');
 
-          // Clear relevant cache entries
+          // Clear relevant cache entries after minting
           const tokenId = import.meta.env.VITE_NFT_COLLECTION_ID;
           if (tokenId) {
+            // Only clear token info (for updated total supply)
             cacheService.delete(`token-info-${tokenId}`);
-            // Clear all collection NFT caches
+
+            // Clear collection NFT caches more selectively
+            // Only clear the first page cache since new NFTs appear at the end
             const stats = cacheService.getStats();
             stats.keys.forEach(key => {
-              if (key.startsWith(`collection-nfts-${tokenId}`)) {
+              if (key.startsWith(`collection-nfts-${tokenId}`) && key.includes('-0')) {
                 cacheService.delete(key);
               }
             });
-            console.log('🗑️ Cleared NFT cache after minting');
+            console.log('🗑️ Cleared relevant NFT cache entries after minting');
           }
 
           return result;
@@ -443,7 +446,7 @@ export class BackendService {
         success: false,
         error: 'Failed to fetch collection NFTs - no backend services available'
       };
-    }, 1 * 60 * 1000); // Cache for 1 minute
+    }, 10 * 60 * 1000); // Cache for 10 minutes (increased from 1 minute)
   }
 }
 

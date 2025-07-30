@@ -152,13 +152,17 @@ const convertNFTToMediaNFT = async (nft: any): Promise<MediaNFT | null> => {
     ].filter(Boolean);
 
     console.log(`🔍 NFT #${nft.serialNumber} type indicators:`, typeIndicators);
+    console.log(`🔍 NFT #${nft.serialNumber} full metadata content:`, metadataContent);
 
     for (const indicator of typeIndicators) {
       if (typeof indicator === 'string') {
-        if (indicator.toLowerCase().includes('video') || indicator.startsWith('video/')) {
+        const lowerIndicator = indicator.toLowerCase();
+        if (lowerIndicator === 'video' || lowerIndicator.includes('video') || lowerIndicator.startsWith('video/')) {
+          console.log(`🎬 NFT #${nft.serialNumber} detected as video from type indicator: ${indicator}`);
           mediaType = 'video';
           break;
-        } else if (indicator.toLowerCase().includes('audio') || indicator.startsWith('audio/')) {
+        } else if (lowerIndicator === 'audio' || lowerIndicator.includes('audio') || lowerIndicator.startsWith('audio/')) {
+          console.log(`🎵 NFT #${nft.serialNumber} detected as audio from type indicator: ${indicator}`);
           mediaType = 'audio';
           break;
         }
@@ -171,14 +175,19 @@ const convertNFTToMediaNFT = async (nft: any): Promise<MediaNFT | null> => {
     const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
     const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac'];
 
+    console.log(`🔍 NFT #${nft.serialNumber} checking URLs:`, { imageUrl, fileName });
+
     if (mediaType === 'image') { // Only check extensions if type not already determined
       const urlsToCheck = [imageUrl, fileName].filter(Boolean);
       for (const url of urlsToCheck) {
         const lowerUrl = url.toLowerCase();
+        console.log(`🔍 NFT #${nft.serialNumber} checking URL: ${url} (lowercase: ${lowerUrl})`);
         if (videoExtensions.some(ext => lowerUrl.includes(ext))) {
+          console.log(`🎬 NFT #${nft.serialNumber} detected as video from extension in: ${url}`);
           mediaType = 'video';
           break;
         } else if (audioExtensions.some(ext => lowerUrl.includes(ext))) {
+          console.log(`🎵 NFT #${nft.serialNumber} detected as audio from extension in: ${url}`);
           mediaType = 'audio';
           break;
         }

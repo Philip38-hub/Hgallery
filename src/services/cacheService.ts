@@ -6,7 +6,54 @@ interface CacheItem<T> {
 
 class CacheService {
   private cache = new Map<string, CacheItem<any>>();
-  private defaultTTL = 5 * 60 * 1000; // 5 minutes
+  private defaultTTL = 15 * 60 * 1000; // 15 minutes (increased from 5 minutes)
+  private persistentKeys = ['token-info-', 'collection-nfts-']; // Keys that should persist across page reloads
+
+  constructor() {
+    this.loadFromStorage();
+  }
+
+  /**
+   * Load cache from localStorage
+   */
+  private loadFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('hgallery-cache');
+      if (stored) {
+        const parsedCache = JSON.parse(stored);
+        const now = Date.now();
+
+        for (const [key, item] of Object.entries(parsedCache)) {
+          const cacheItem = item as CacheItem<any>;
+          if (now <= cacheItem.expiresAt) {
+            this.cache.set(key, cacheItem);
+          }
+        }
+        console.log(`📦 Loaded ${this.cache.size} items from persistent cache`);
+      }
+    } catch (error) {
+      console.warn('Failed to load cache from storage:', error);
+    }
+  }
+
+  /**
+   * Save cache to localStorage (only persistent keys)
+   */
+  private saveToStorage(): void {
+    try {
+      const persistentCache: Record<string, CacheItem<any>> = {};
+
+      for (const [key, item] of this.cache.entries()) {
+        if (this.persistentKeys.some(prefix => key.startsWith(prefix))) {
+          persistentCache[key] = item;
+        }
+      }
+
+      localStorage.setItem('hgallery-cache', JSON.stringify(persistentCache));
+    } catch (error) {
+      console.warn('Failed to save cache to storage:', error);
+    }
+  }
 
   /**
    * Set a cache item with optional TTL
@@ -14,7 +61,7 @@ class CacheService {
   set<T>(key: string, data: T, ttl?: number): void {
     const now = Date.now();
     const expiresAt = now + (ttl || this.defaultTTL);
-    
+
     this.cache.set(key, {
       data,
       timestamp: now,
@@ -22,6 +69,11 @@ class CacheService {
     });
 
     console.log(`📦 Cached: ${key} (expires in ${Math.round((expiresAt - now) / 1000)}s)`);
+
+    // Save to storage if it's a persistent key
+    if (this.persistentKeys.some(prefix => key.startsWith(prefix))) {
+      this.saveToStorage();
+    }
   }
 
   /**
@@ -59,6 +111,11 @@ class CacheService {
   delete(key: string): void {
     this.cache.delete(key);
     console.log(`🗑️ Cache deleted: ${key}`);
+
+    // Update storage if it was a persistent key
+    if (this.persistentKeys.some(prefix => key.startsWith(prefix))) {
+      this.saveToStorage();
+    }
   }
 
   /**
@@ -66,6 +123,7 @@ class CacheService {
    */
   clear(): void {
     this.cache.clear();
+    localStorage.removeItem('hgallery-cache');
     console.log('🗑️ Cache cleared');
   }
 
