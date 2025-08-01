@@ -1,6 +1,6 @@
-# Hedera Decentralized Gallery MVP
+# HArchive mvp
 
-A complete decentralized video and photo gallery built on the Hedera blockchain with React, featuring NFT minting, IPFS storage, HashPack wallet integration, and advanced media playback capabilities.
+A complete decentralized video and photo gallery built on the Hedera blockchain with React, featuring NFT minting & transfer, IPFS storage, HashPack wallet integration, and media playback capabilities.
 
 ## Features
 
@@ -42,14 +42,10 @@ tsx scripts/setup-deployment.ts
 2. **Deploy to Netlify**: Connect your GitHub repo to Netlify
 3. **Configure Environment Variables**: Set all required variables in both platforms
 
-### Option 3: One-Click Deploy
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/your-username/hgallery)
-
 ## 📚 Documentation
 
 - [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Complete deployment instructions
 - [Backend Setup](./BACKEND_SETUP.md) - Backend configuration details
-- [MVP Demo Guide](./MVP_DEMO_GUIDE.md) - Demo walkthrough
 - [NFT Setup Guide](./NFT_SETUP_GUIDE.md) - NFT collection setup
 
 ## Prerequisites
@@ -61,8 +57,12 @@ tsx scripts/setup-deployment.ts
 ## Installation
 
 1. Clone the repository
+```bash
+   git clone https://github.com/Philip38-hub/Hgallery.git
+```
 2. Install dependencies:
    ```bash
+   cd Hgallery
    npm install
    ```
 
@@ -231,12 +231,14 @@ tsx scripts/setup-deployment.ts
 - User profile and statistics
 
 ### Phase 6: Future Enhancements
+- Business model- minting fees and pro features
 - Mirror node integration
 - Advanced filtering
 - Content moderation
 - Mobile app version
 - Marketplace features
 - Social features (likes, comments)
+- Youtube ai agent mode(to manage the contents on youtube)
 
 ## Current Implementation
 
